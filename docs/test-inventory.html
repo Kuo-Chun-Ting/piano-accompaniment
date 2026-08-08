@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Test Inventory</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; padding: 32px; background: #f6f6f7; color: #1d1d1f; }
+    h1 { margin: 0 0 20px; font-size: 28px; line-height: 1.2; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border: 1px solid #d8d8dc; border-radius: 12px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-right: 1px solid #e5e5ea; border-bottom: 1px solid #e5e5ea; text-align: left; vertical-align: top; font-size: 13px; line-height: 1.45; }
+    th { position: sticky; top: 0; z-index: 1; background: #f1f1f3; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    th:last-child, td:last-child { border-right: 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    .type { font-weight: 700; white-space: nowrap; background: #fafafa; }
+    .file { min-width: 220px; background: #fcfcfd; }
+    .scope { min-width: 260px; color: #424245; background: #fcfcfd; }
+    .count { text-align: right; white-space: nowrap; background: #fcfcfd; }
+    .function { min-width: 320px; }
+    .io { min-width: 180px; }
+  </style>
+</head>
+<body>
+  <h1>Test Inventory</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>File</th>
+        <th>File scope</th>
+        <th>Test count</th>
+        <th>Test function</th>
+        <th>Input</th>
+        <th>Expected output</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="type" rowspan="149">Unit</td>
+        <td class="file" rowspan="10"><code>tests/unit/arrangement/generateArrangement.test.ts</code></td>
+        <td class="scope" rowspan="10">輸入 confirmed chart 與 style；預期輸出可播放的伴奏 score、節拍事件、歌詞 cue 與錯誤資訊。</td>
+        <td class="count" rowspan="10">10</td>
+        <td class="function"><code>test_generateArrangement_when_confirmed_chart_then_returns_easy_and_rich_scores</code></td>
+        <td class="io">輸入有效 confirmed chart</td>
+        <td class="io">預期輸出 easy 與 rich 兩種 score。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_generateArrangement_when_mood_changes_then_returns_expected_rich_rhythms</code></td>
+        <td class="io">輸入不同 mood</td>
+        <td class="io">預期 rich 伴奏節奏跟 mood 對應。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_generateArrangement_when_section_is_chorus_then_returns_stronger_intensity</code></td>
+        <td class="io">輸入 chorus section</td>
+        <td class="io">預期輸出較強的伴奏 intensity。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_generateArrangement_when_section_is_intro_then_returns_soft_intensity</code></td>
+        <td class="io">輸入 intro section</td>
+        <td class="io">預期輸出較弱的伴奏 intensity。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_generateArrangement_when_score_is_generated_then_each_hand_fills_four_beats</code></td>
+        <td class="io">輸入四拍小節</td>
+        <td class="io">預期左右手事件填滿四拍。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_generateArrangement_when_chord_changes_then_marks_each_change_on_the_score</code></td>
+        <td class="io">輸入有換和弦的小節</td>
+        <td class="io">預期 score 標記每次和弦變化。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_generateArrangement_when_chords_have_lyrics_then_positions_each_segment_at_chord_start_beat</code></td>
+        <td class="io">輸入和弦帶歌詞片段</td>
+        <td class="io">預期歌詞 cue 放在對應和弦起始拍。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_generateArrangement_when_measure_has_lyric_then_positions_lyric_at_measure_start</code></td>
+        <td class="io">輸入小節歌詞</td>
+        <td class="io">預期歌詞 cue 放在小節起始拍。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_generateArrangement_when_measure_has_no_lyrics_then_returns_empty_lyric_cues</code></td>
+        <td class="io">輸入沒有歌詞的小節</td>
+        <td class="io">預期 lyric cues 為空。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_generateArrangement_when_chord_is_unsupported_then_reports_issue</code></td>
+        <td class="io">輸入不支援和弦</td>
+        <td class="io">預期輸出 blocking issue。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="2"><code>tests/unit/audio/pianoSamples.test.ts</code></td>
+        <td class="scope" rowspan="2">輸入音名與 sample catalog；預期輸出正規化 sample key 與完整 sample URL 清單。</td>
+        <td class="count" rowspan="2">2</td>
+        <td class="function"><code>test_normalizeSamplePitch_when_pitch_uses_flat_then_returns_matching_sharp_sample</code></td>
+        <td class="io">輸入降記號音名</td>
+        <td class="io">預期輸出等價升記號 sample key。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PIANO_SAMPLE_URLS_when_catalog_is_built_then_contains_each_supported_key</code></td>
+        <td class="io">輸入 sample catalog</td>
+        <td class="io">預期每個支援音高都有 URL。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="7"><code>tests/unit/audio/playbackSchedule.test.ts</code></td>
+        <td class="scope" rowspan="7">輸入 score、播放秒數與 tempo；預期輸出播放排程、目前位置、seek 秒數與重計時結果。</td>
+        <td class="count" rowspan="7">7</td>
+        <td class="function"><code>test_buildPlaybackSchedule_when_score_has_two_measures_then_offsets_second_measure</code></td>
+        <td class="io">輸入兩小節 score</td>
+        <td class="io">預期第二小節事件時間正確位移。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildPlaybackPosition_when_playing_inside_measure_then_returns_measure_and_active_events</code></td>
+        <td class="io">輸入小節中的播放秒數</td>
+        <td class="io">預期回傳當前小節與 active events。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildPlaybackPosition_when_event_reaches_end_then_excludes_event</code></td>
+        <td class="io">輸入剛好到事件結尾的秒數</td>
+        <td class="io">預期該事件不再 active。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildPlaybackPosition_when_elapsed_exceeds_score_then_clamps_to_end</code></td>
+        <td class="io">輸入超過 score 長度的秒數</td>
+        <td class="io">預期播放位置 clamp 到結尾。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getMeasureSeekSeconds_when_position_is_inside_measure_then_returns_absolute_seconds</code></td>
+        <td class="io">輸入小節內進度</td>
+        <td class="io">預期輸出絕對播放秒數。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getMeasureSeekSeconds_when_progress_is_outside_measure_then_clamps_progress</code></td>
+        <td class="io">輸入超出小節範圍的進度</td>
+        <td class="io">預期進度被 clamp。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_retimePlaybackSeconds_when_bpm_changes_then_preserves_absolute_beat</code></td>
+        <td class="io">輸入 tempo 變更前後 bpm</td>
+        <td class="io">預期保留相同 beat 位置。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="4"><code>tests/unit/audio/playbackTempo.test.ts</code></td>
+        <td class="scope" rowspan="4">輸入來源 tempo 或使用者 tempo；預期輸出初始 bpm 與合法化 bpm。</td>
+        <td class="count" rowspan="4">4</td>
+        <td class="function"><code>test_resolveInitialPlaybackBpm_when_source_exists_then_returns_source_bpm</code></td>
+        <td class="io">輸入來源 bpm</td>
+        <td class="io">預期回傳來源 bpm。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_resolveInitialPlaybackBpm_when_source_is_missing_then_returns_default_bpm</code></td>
+        <td class="io">輸入缺少來源 bpm</td>
+        <td class="io">預期回傳預設 bpm。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_normalizePlaybackBpm_when_value_is_outside_range_then_clamps_value</code></td>
+        <td class="io">輸入超出範圍 bpm</td>
+        <td class="io">預期 clamp 到合法範圍。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_normalizePlaybackBpm_when_value_is_invalid_then_returns_fallback</code></td>
+        <td class="io">輸入非法 bpm</td>
+        <td class="io">預期回傳 fallback。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="21"><code>tests/unit/chart-editor/document.test.ts</code></td>
+        <td class="scope" rowspan="21">輸入 parsed chart 與編輯操作；預期輸出 chart editor document、selection 與有效性狀態。</td>
+        <td class="count" rowspan="21">21</td>
+        <td class="function"><code>test_createChartEditorDocument_when_source_splits_two_plus_one_plus_one_then_groups_once</code></td>
+        <td class="io">輸入 2+1+1 拍來源</td>
+        <td class="io">預期只 group 成一個四拍小節。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_createChartEditorDocument_when_total_overflows_then_keeps_values_and_marks_measure_invalid</code></td>
+        <td class="io">輸入超過四拍小節</td>
+        <td class="io">預期保留資料並標 invalid。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getInvalidMeasureIds_when_chord_is_unsupported_then_marks_measure_invalid</code></td>
+        <td class="io">輸入不支援和弦</td>
+        <td class="io">預期該小節 id 被列為 invalid。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_createChartEditorDocument_when_chart_has_multiple_sections_then_flattens_source_order</code></td>
+        <td class="io">輸入多 section chart</td>
+        <td class="io">預期依來源順序攤平成小節。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_addPlacement_when_measure_exists_then_appends_one_beat_empty_chord</code></td>
+        <td class="io">輸入既有小節</td>
+        <td class="io">預期新增一拍空和弦到尾端。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_insertPlacement_when_position_is_before_then_inserts_next_to_reference_chord</code></td>
+        <td class="io">輸入 reference chord 與 before 位置</td>
+        <td class="io">預期新和弦插在 reference 旁。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_deletePlacement_when_it_is_last_chord_then_keeps_empty_invalid_measure</code></td>
+        <td class="io">輸入只剩一個和弦的小節</td>
+        <td class="io">預期刪除後保留空 invalid 小節。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_updatePlacementFields_when_values_change_then_updates_only_selected_placement</code></td>
+        <td class="io">輸入 placement 欄位修改</td>
+        <td class="io">預期只更新目標 placement。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_movePlacement_when_target_is_another_measure_then_preserves_fixed_boundaries</code></td>
+        <td class="io">輸入跨小節拖曳</td>
+        <td class="io">預期和弦移動且小節邊界固定。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_movePlacement_when_moved_later_in_same_measure_then_uses_final_index</code></td>
+        <td class="io">輸入同小節往後拖曳</td>
+        <td class="io">預期使用移除後的正確 index。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_movePlacement_when_placement_is_missing_then_returns_same_document</code></td>
+        <td class="io">輸入不存在的 placement id</td>
+        <td class="io">預期 document 不變。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_moveMeasure_when_moved_after_another_measure_then_moves_lyrics_and_chords_together</code></td>
+        <td class="io">輸入小節移動到另一小節後</td>
+        <td class="io">預期歌詞與和弦一起移動。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_moveMeasure_when_source_precedes_target_then_adjusts_index_after_removal</code></td>
+        <td class="io">輸入來源小節在目標前方的移動</td>
+        <td class="io">預期移除後 target index 正確調整。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_insertEmptyMeasure_when_inserted_before_then_preserves_other_measures</code></td>
+        <td class="io">輸入 before 插入空小節</td>
+        <td class="io">預期其他小節內容不變。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_insertEmptyMeasure_when_inserted_after_then_preserves_other_measures</code></td>
+        <td class="io">輸入 after 插入空小節</td>
+        <td class="io">預期其他小節內容不變。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_insertEmptyMeasure_when_document_is_empty_then_uses_default_section</code></td>
+        <td class="io">輸入空 document</td>
+        <td class="io">預期新增 default section 空小節。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_deleteMeasure_when_measure_has_content_then_removes_its_chords_and_lyrics</code></td>
+        <td class="io">輸入有內容的小節刪除</td>
+        <td class="io">預期該小節和弦與歌詞一起移除。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_deleteMeasure_when_it_is_the_last_measure_then_returns_empty_document</code></td>
+        <td class="io">輸入最後一個小節刪除</td>
+        <td class="io">預期 document 變空。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_canArrangeDocument_when_document_is_empty_then_returns_false</code></td>
+        <td class="io">輸入空 document</td>
+        <td class="io">預期不可產生伴奏。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_canArrangeDocument_when_measure_is_empty_then_returns_false</code></td>
+        <td class="io">輸入空小節</td>
+        <td class="io">預期不可產生伴奏。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildEditorSelection_when_measures_are_reordered_then_groups_and_renumbers_sections</code></td>
+        <td class="io">輸入重排後 document</td>
+        <td class="io">預期 selection 重新分組並重編 section。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="5"><code>tests/unit/chart-editor/history.test.ts</code></td>
+        <td class="scope" rowspan="5">輸入 editor history 與 undo / redo 操作；預期輸出正確的 past、present、future 狀態。</td>
+        <td class="count" rowspan="5">5</td>
+        <td class="function"><code>test_undoEditorHistory_when_text_was_committed_per_character_then_removes_one_character</code></td>
+        <td class="io">輸入逐字 commit history</td>
+        <td class="io">預期 undo 只移除一個字。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_redoEditorHistory_when_change_was_undone_then_restores_change</code></td>
+        <td class="io">輸入已 undo 的 history</td>
+        <td class="io">預期 redo 還原變更。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_commitEditorHistory_when_called_after_undo_then_clears_redo_branch</code></td>
+        <td class="io">輸入 undo 後的新 commit</td>
+        <td class="io">預期 redo branch 清空。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_undoEditorHistory_when_no_past_exists_then_returns_same_history</code></td>
+        <td class="io">輸入沒有 past 的 history</td>
+        <td class="io">預期 history 不變。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_redoEditorHistory_when_no_future_exists_then_returns_same_history</code></td>
+        <td class="io">輸入沒有 future 的 history</td>
+        <td class="io">預期 history 不變。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="10"><code>tests/unit/errors/parseChartError.test.ts</code></td>
+        <td class="scope" rowspan="10">輸入 API、圖片、schema、config、連線與未知錯誤；預期輸出對應的錯誤訊息。</td>
+        <td class="count" rowspan="10">10</td>
+        <td class="function"><code>test_getParseChartErrorMessage_when_openai_quota_is_exceeded_then_returns_billing_message</code></td>
+        <td class="io">輸入 quota exceeded error</td>
+        <td class="io">預期輸出 billing 訊息。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getParseChartErrorMessage_when_model_is_invalid_then_returns_model_message</code></td>
+        <td class="io">輸入 invalid model error</td>
+        <td class="io">預期輸出 model 設定訊息。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getParseChartErrorMessage_when_model_output_schema_fails_then_returns_format_message</code></td>
+        <td class="io">輸入 schema validation error</td>
+        <td class="io">預期輸出格式錯誤訊息。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getParseChartErrorMessage_when_chart_image_is_explicitly_unreadable_then_returns_image_message</code></td>
+        <td class="io">輸入 HTTP 422 的 unreadable image error</td>
+        <td class="io">預期輸出圖片錯誤訊息。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getParseChartErrorMessage_when_runtime_config_is_missing_then_returns_config_message</code></td>
+        <td class="io">輸入缺 runtime config error</td>
+        <td class="io">預期輸出設定錯誤訊息。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getParseChartErrorMessage_when_api_key_is_missing_then_returns_config_message</code></td>
+        <td class="io">輸入缺 API key error</td>
+        <td class="io">預期輸出設定錯誤訊息。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getParseChartErrorMessage_when_nested_response_reports_quota_then_returns_billing_message</code></td>
+        <td class="io">輸入 nested quota error</td>
+        <td class="io">預期輸出 billing 訊息。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getParseChartErrorMessage_when_error_is_user_facing_then_preserves_message</code></td>
+        <td class="io">輸入 user-facing error</td>
+        <td class="io">預期保留原訊息。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getParseChartErrorMessage_when_server_connection_fails_then_returns_server_message</code></td>
+        <td class="io">輸入 failed fetch error</td>
+        <td class="io">預期輸出伺服器未啟動訊息。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getParseChartErrorMessage_when_error_is_unknown_then_returns_unknown_message</code></td>
+        <td class="io">輸入未知 error</td>
+        <td class="io">預期輸出未知錯誤訊息。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="16"><code>tests/unit/music/chords.test.ts</code></td>
+        <td class="scope" rowspan="16">輸入和弦字串；預期輸出 parsed chord、normalized symbol 或和弦音。</td>
+        <td class="count" rowspan="16">16</td>
+        <td class="function"><code>test_parseChordSymbol_when_major_chord_then_returns_major_quality</code></td>
+        <td class="io">輸入大三和弦</td>
+        <td class="io">預期 quality 為 major。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChordSymbol_when_minor_slash_chord_then_returns_bass_note</code></td>
+        <td class="io">輸入 minor slash chord</td>
+        <td class="io">預期解析出 bass note。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getChordToneNames_when_add9_chord_then_includes_second_color</code></td>
+        <td class="io">輸入 add9 chord</td>
+        <td class="io">預期和弦音包含 9 度色彩音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChordSymbol_when_dominant_seventh_sus4_chord_then_returns_supported_quality</code></td>
+        <td class="io">輸入 7sus4</td>
+        <td class="io">預期解析為支援 quality。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getChordToneNames_when_dominant_seventh_sus4_chord_then_returns_suspended_seventh_tones</code></td>
+        <td class="io">輸入 7sus4</td>
+        <td class="io">預期輸出 sus4 與 seventh tones。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getChordToneNames_when_flat_chord_then_returns_flat_spelling</code></td>
+        <td class="io">輸入降記號和弦</td>
+        <td class="io">預期輸出降記號拼法。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_normalizeChordSymbol_when_91pu_uses_music_accidentals_then_returns_ascii_symbol</code></td>
+        <td class="io">輸入 91pu Unicode 升降記號</td>
+        <td class="io">預期輸出 ASCII symbol。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_normalizeChordSymbol_when_91pu_wraps_optional_chord_then_removes_outer_parentheses</code></td>
+        <td class="io">輸入外層括號 optional chord</td>
+        <td class="io">預期移除外層括號。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChordSymbol_when_slash_chord_uses_any_supported_bass_note_then_returns_bass_note</code></td>
+        <td class="io">輸入任一支援 bass 的 slash chord</td>
+        <td class="io">預期解析 bass note。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChordSymbol_when_dominant_ninth_or_thirteenth_then_returns_supported_quality</code></td>
+        <td class="io">輸入 dominant 9 或 13</td>
+        <td class="io">預期解析為支援 quality。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChordSymbol_when_91pu_uses_flat_ninth_suffix_then_returns_supported_quality</code></td>
+        <td class="io">輸入 91pu flat ninth suffix</td>
+        <td class="io">預期解析為支援 quality。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChordSymbol_when_91pu_uses_minor_seventh_flat_fifth_then_returns_supported_quality</code></td>
+        <td class="io">輸入 m7b5</td>
+        <td class="io">預期解析為支援 quality。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getChordToneNames_when_dominant_ninth_or_thirteenth_then_returns_extended_tones</code></td>
+        <td class="io">輸入 dominant 9 或 13</td>
+        <td class="io">預期輸出延伸和弦音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getChordToneNames_when_dominant_flat_ninth_then_returns_flat_ninth_tones</code></td>
+        <td class="io">輸入 dominant b9</td>
+        <td class="io">預期輸出 flat ninth tones。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getChordToneNames_when_minor_seventh_flat_fifth_then_returns_half_diminished_tones</code></td>
+        <td class="io">輸入 m7b5</td>
+        <td class="io">預期輸出 half-diminished tones。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChordSymbol_when_symbol_is_unsupported_then_returns_null</code></td>
+        <td class="io">輸入不支援 symbol</td>
+        <td class="io">預期回傳 null。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="2"><code>tests/unit/music/keyNormalization.test.ts</code></td>
+        <td class="scope" rowspan="2">輸入調性選擇；預期輸出正規化 key 與 mode。</td>
+        <td class="count" rowspan="2">2</td>
+        <td class="function"><code>test_normalizeKeySelection_when_major_mode_then_returns_c_major</code></td>
+        <td class="io">輸入 major mode</td>
+        <td class="io">預期輸出 C major。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_normalizeKeySelection_when_minor_mode_then_returns_a_minor</code></td>
+        <td class="io">輸入 minor mode</td>
+        <td class="io">預期輸出 A minor。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="6"><code>tests/unit/music/measureGrouping.test.ts</code></td>
+        <td class="scope" rowspan="6">輸入 AI chart sections；預期輸出四拍小節、合併歌詞與 grouping issue。</td>
+        <td class="count" rowspan="6">6</td>
+        <td class="function"><code>test_groupSectionsIntoMeasures_when_interlude_durations_are_corrected_then_returns_eight_measures</code></td>
+        <td class="io">輸入修正後間奏 durations</td>
+        <td class="io">預期輸出八個小節。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_groupSectionsIntoMeasures_when_chord_crosses_measure_boundary_then_returns_overflow_issue</code></td>
+        <td class="io">輸入跨小節和弦</td>
+        <td class="io">預期輸出 overflow issue。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_groupSectionsIntoMeasures_when_section_ends_before_four_beats_then_returns_incomplete_issue</code></td>
+        <td class="io">輸入未滿四拍 section</td>
+        <td class="io">預期輸出 incomplete issue。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_groupSectionsIntoMeasures_when_source_measure_has_lyric_then_carries_lyric_to_grouped_measure</code></td>
+        <td class="io">輸入來源小節歌詞</td>
+        <td class="io">預期歌詞帶到 grouped measure。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_groupSectionsIntoMeasures_when_91pu_short_bar_continues_then_merges_into_one_measure</code></td>
+        <td class="io">輸入 91pu 短 bar 延續資料</td>
+        <td class="io">預期合併成一個小節。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_groupSectionsIntoMeasures_when_merged_lyrics_include_uncertainty_then_preserves_review_state</code></td>
+        <td class="io">輸入含不確定歌詞的合併小節</td>
+        <td class="io">預期保留 review state。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="8"><code>tests/unit/music/transposition.test.ts</code></td>
+        <td class="scope" rowspan="8">輸入 confirmed chart 與目標調；預期輸出移調後和弦或錯誤。</td>
+        <td class="count" rowspan="8">8</td>
+        <td class="function"><code>test_transposeConfirmedChart_when_g_major_chart_then_transposes_chords_to_c_major</code></td>
+        <td class="io">輸入 G major chart</td>
+        <td class="io">預期和弦移到 C major。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_transposeConfirmedChart_when_e_minor_chart_then_transposes_chords_to_a_minor</code></td>
+        <td class="io">輸入 E minor chart</td>
+        <td class="io">預期和弦移到 A minor。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_transposeConfirmedChart_when_chromatic_chord_then_preserves_readable_note_spelling</code></td>
+        <td class="io">輸入 chromatic chord</td>
+        <td class="io">預期保留可讀音名拼法。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_transposeConfirmedChart_when_91pu_chord_uses_unicode_flat_then_transposes_chord</code></td>
+        <td class="io">輸入 Unicode flat chord</td>
+        <td class="io">預期正確移調。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_transposeConfirmedChart_when_dominant_ninth_or_thirteenth_then_preserves_quality</code></td>
+        <td class="io">輸入 dominant 9 或 13</td>
+        <td class="io">預期移調後保留 quality。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_transposeConfirmedChart_when_91pu_uses_flat_ninth_suffix_then_preserves_quality</code></td>
+        <td class="io">輸入 flat ninth suffix</td>
+        <td class="io">預期移調後保留 quality。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_transposeConfirmedChart_when_original_key_is_unsupported_then_throws_key_error</code></td>
+        <td class="io">輸入不支援原調</td>
+        <td class="io">預期丟 key error。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_transposeConfirmedChart_when_chord_is_unsupported_then_throws_chord_error</code></td>
+        <td class="io">輸入不支援和弦</td>
+        <td class="io">預期丟 chord error。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="10"><code>tests/unit/schemas/chart.test.ts</code></td>
+        <td class="scope" rowspan="10">輸入 request、AI chart response 與 confirmed chart；預期輸出 schema validation 或 confirmed chart。</td>
+        <td class="count" rowspan="10">10</td>
+        <td class="function"><code>test_ExtractedChartSchema_when_chord_and_duration_have_separate_confidence_then_parses_data</code></td>
+        <td class="io">輸入 chord 與 duration 分開 confidence 的資料</td>
+        <td class="io">預期 schema parse 成功。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ParseChartRequestSchema_when_image_order_is_missing_then_rejects_data</code></td>
+        <td class="io">輸入缺 image order request</td>
+        <td class="io">預期 schema reject。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ParseChartRequestSchema_when_model_is_missing_then_rejects_data</code></td>
+        <td class="io">輸入缺 model request</td>
+        <td class="io">預期 schema reject。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ParseChartRequestSchema_when_supported_model_is_provided_then_accepts_model</code></td>
+        <td class="io">輸入支援 model</td>
+        <td class="io">預期 schema accept。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ParseChartRequestSchema_when_unknown_model_is_provided_then_rejects_data</code></td>
+        <td class="io">輸入未知 model</td>
+        <td class="io">預期 schema reject。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ParseChartRequestSchema_when_filename_is_missing_then_rejects_image</code></td>
+        <td class="io">輸入缺 filename image</td>
+        <td class="io">預期 schema reject。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildConfirmedChart_when_measure_totals_four_beats_then_returns_confirmed_chart</code></td>
+        <td class="io">輸入每小節四拍 chart</td>
+        <td class="io">預期輸出 confirmed chart。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildConfirmedChart_when_measure_does_not_total_four_beats_then_throws_error</code></td>
+        <td class="io">輸入小節非四拍 chart</td>
+        <td class="io">預期丟錯。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildConfirmedChart_when_original_key_is_missing_then_throws_required_key_error</code></td>
+        <td class="io">輸入缺 original key chart</td>
+        <td class="io">預期丟 required key error。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildConfirmedChart_when_normalized_key_is_a_minor_then_sets_minor_mode</code></td>
+        <td class="io">輸入 A minor normalized key</td>
+        <td class="io">預期 mode 設為 minor。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="4"><code>tests/unit/server/chartParsingWorkflow.test.ts</code></td>
+        <td class="scope" rowspan="4">輸入 chart task runner 與 abort signal；預期輸出 workflow events 與 task 呼叫次數。</td>
+        <td class="count" rowspan="4">4</td>
+        <td class="function"><code>test_parseChartWorkflow_when_first_result_is_valid_then_calls_ai_once</code></td>
+        <td class="io">輸入第一次成功的 task</td>
+        <td class="io">預期只呼叫 AI 一次。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChartWorkflow_when_task_succeeds_then_emits_job_completed_with_total_duration</code></td>
+        <td class="io">輸入成功 task</td>
+        <td class="io">預期 emit completed 與總耗時。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChartWorkflow_when_task_aborts_then_emits_job_stopped_once</code></td>
+        <td class="io">輸入 abort 中的 task</td>
+        <td class="io">預期只 emit 一次 stopped。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChartWorkflow_when_signal_is_already_aborted_then_starts_no_tasks</code></td>
+        <td class="io">輸入已 aborted signal</td>
+        <td class="io">預期不啟動 task。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="3"><code>tests/unit/server/chartStream.test.ts</code></td>
+        <td class="scope" rowspan="3">輸入 SSE chunks 與 stream message；預期輸出 decoded blocks、encoded frame 與 schema result。</td>
+        <td class="count" rowspan="3">3</td>
+        <td class="function"><code>test_decodeChartStreamBlocks_when_chunk_splits_message_then_keeps_incomplete_remainder</code></td>
+        <td class="io">輸入被切開的 SSE chunk</td>
+        <td class="io">預期保留 incomplete remainder。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_encodeChartStreamMessage_when_error_is_encoded_then_returns_exact_sse_frame</code></td>
+        <td class="io">輸入 error message</td>
+        <td class="io">預期輸出精確 SSE frame。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ChartStreamMessageSchema_when_error_message_then_requires_message</code></td>
+        <td class="io">輸入 error stream payload</td>
+        <td class="io">預期 schema 要求 message。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="4"><code>tests/unit/server/compactChartResponse.test.ts</code></td>
+        <td class="scope" rowspan="4">輸入 compact AI response；預期輸出 expanded chart response。</td>
+        <td class="count" rowspan="4">4</td>
+        <td class="function"><code>test_expandCompactChartResponse_when_measure_has_lyrics_then_assigns_them_to_the_measure</code></td>
+        <td class="io">輸入含 lyrics 的 measure</td>
+        <td class="io">預期 lyrics 指派到該小節。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_expandCompactChartResponse_when_chord_uses_unicode_flat_then_normalizes_symbol</code></td>
+        <td class="io">輸入 Unicode flat chord</td>
+        <td class="io">預期 symbol 正規化。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_expandCompactChartResponse_when_fields_are_uncertain_or_missing_then_maps_confidence</code></td>
+        <td class="io">輸入不確定或缺值欄位</td>
+        <td class="io">預期 confidence 正確映射。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_expandCompactChartResponse_when_section_label_is_blank_then_uses_section_order</code></td>
+        <td class="io">輸入空 section label</td>
+        <td class="io">預期用 section order 補 label。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="4"><code>tests/unit/server/openaiChartTask.test.ts</code></td>
+        <td class="scope" rowspan="4">輸入圖片、OpenAI stub response 與 abort signal；預期輸出 OpenAI task events 或錯誤。</td>
+        <td class="count" rowspan="4">4</td>
+        <td class="function"><code>test_runChartTask_when_images_are_out_of_order_then_sends_prompt_images_in_source_order_and_signal</code></td>
+        <td class="io">輸入順序打亂的圖片</td>
+        <td class="io">預期依 source order 送 prompt 並傳 signal。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_runChartTask_when_task_completes_then_reports_started_raw_output_and_duration</code></td>
+        <td class="io">輸入成功 OpenAI output</td>
+        <td class="io">預期回報 started、raw output 與 duration。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_runChartTask_when_output_is_invalid_then_reports_failed_task</code></td>
+        <td class="io">輸入 invalid output</td>
+        <td class="io">預期回報 failed task。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_runChartTask_when_output_is_not_json_then_emits_failed_event_and_throws_json_error</code></td>
+        <td class="io">輸入非 JSON output</td>
+        <td class="io">預期 emit failed 並丟 JSON error。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="7"><code>tests/unit/ui/chartReading.test.ts</code></td>
+        <td class="scope" rowspan="7">輸入 model id 與讀譜狀態；預期輸出 model 判斷、預設 model 與狀態文字。</td>
+        <td class="count" rowspan="7">7</td>
+        <td class="function"><code>test_isChartReadingModelId_when_model_is_supported_then_returns_true</code></td>
+        <td class="io">輸入支援 model id</td>
+        <td class="io">預期回傳 true。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_isChartReadingModelId_when_model_is_unknown_then_returns_false</code></td>
+        <td class="io">輸入未知 model id</td>
+        <td class="io">預期回傳 false。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_defaultChartReadingModel_when_loaded_then_uses_balanced_model</code></td>
+        <td class="io">輸入預設設定</td>
+        <td class="io">預期使用 balanced model。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildChartReadingStatusText_when_reading_is_idle_then_returns_null</code></td>
+        <td class="io">輸入 idle 狀態</td>
+        <td class="io">預期不顯示狀態文字。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildChartReadingStatusText_when_reading_is_active_then_returns_analysis_time</code></td>
+        <td class="io">輸入 reading 中狀態</td>
+        <td class="io">預期顯示分析耗時。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildChartReadingStatusText_when_reading_succeeds_then_returns_final_time</code></td>
+        <td class="io">輸入成功狀態</td>
+        <td class="io">預期顯示完成耗時。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildChartReadingStatusText_when_reading_fails_then_returns_failure_time</code></td>
+        <td class="io">輸入失敗狀態</td>
+        <td class="io">預期顯示失敗耗時。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="4"><code>tests/unit/ui/chartReview.test.ts</code></td>
+        <td class="scope" rowspan="4">輸入和弦 duration 與小節拍數；預期輸出 grid template 與拍數狀態。</td>
+        <td class="count" rowspan="4">4</td>
+        <td class="function"><code>test_buildPlacementGridTemplate_when_chords_have_different_durations_then_returns_beat_proportional_columns</code></td>
+        <td class="io">輸入不同拍數和弦</td>
+        <td class="io">預期輸出按拍數比例分欄。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildPlacementGridTemplate_when_duration_is_missing_then_keeps_column_visible</code></td>
+        <td class="io">輸入缺 duration 和弦</td>
+        <td class="io">預期欄位仍可見。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getMeasureBeatState_when_measure_has_five_beats_then_returns_overflow</code></td>
+        <td class="io">輸入五拍小節</td>
+        <td class="io">預期狀態為 overflow。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getMeasureBeatState_when_measure_has_three_beats_then_returns_incomplete</code></td>
+        <td class="io">輸入三拍小節</td>
+        <td class="io">預期狀態為 incomplete。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="6"><code>tests/unit/ui/comparisonControls.test.ts</code></td>
+        <td class="scope" rowspan="6">輸入 source pane 寬度或 zoom；預期輸出 clamp 後的 UI 控制值。</td>
+        <td class="count" rowspan="6">6</td>
+        <td class="function"><code>test_clampPanePercent_when_value_is_below_minimum_then_returns_minimum</code></td>
+        <td class="io">輸入低於最小 pane percent</td>
+        <td class="io">預期回傳最小值。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_clampPanePercent_when_value_is_above_maximum_then_returns_maximum</code></td>
+        <td class="io">輸入高於最大 pane percent</td>
+        <td class="io">預期回傳最大值。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_clampPanePercent_when_value_is_within_range_then_preserves_value</code></td>
+        <td class="io">輸入合法 pane percent</td>
+        <td class="io">預期保留原值。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_adjustImageZoom_when_result_is_below_minimum_then_returns_minimum</code></td>
+        <td class="io">輸入會低於最小 zoom 的調整</td>
+        <td class="io">預期回傳最小值。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_adjustImageZoom_when_result_is_above_maximum_then_returns_maximum</code></td>
+        <td class="io">輸入會高於最大 zoom 的調整</td>
+        <td class="io">預期回傳最大值。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_adjustImageZoom_when_result_is_within_range_then_applies_delta</code></td>
+        <td class="io">輸入合法 zoom delta</td>
+        <td class="io">預期套用 delta。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="4"><code>tests/unit/ui/elapsedTime.test.ts</code></td>
+        <td class="scope" rowspan="4">輸入 elapsed milliseconds；預期輸出 `mm:ss` 文字。</td>
+        <td class="count" rowspan="4">4</td>
+        <td class="function"><code>test_formatElapsedTime_when_duration_is_zero_then_returns_zero_timestamp</code></td>
+        <td class="io">輸入 0</td>
+        <td class="io">預期輸出 `00:00`。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_formatElapsedTime_when_duration_is_under_one_minute_then_returns_padded_seconds</code></td>
+        <td class="io">輸入一分鐘內秒數</td>
+        <td class="io">預期秒數補零。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_formatElapsedTime_when_duration_crosses_minutes_then_returns_minutes_and_seconds</code></td>
+        <td class="io">輸入超過一分鐘秒數</td>
+        <td class="io">預期輸出分秒。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_formatElapsedTime_when_duration_is_negative_or_fractional_then_normalizes_seconds</code></td>
+        <td class="io">輸入負數或小數秒</td>
+        <td class="io">預期正規化後輸出。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="2"><code>tests/unit/ui/scoreLayout.test.ts</code></td>
+        <td class="scope" rowspan="2">輸入 score cue beat 與 note area；預期輸出 cue 的 X 座標。</td>
+        <td class="count" rowspan="2">2</td>
+        <td class="function"><code>test_getScoreCueX_when_cue_starts_on_third_beat_then_returns_middle_of_note_area</code></td>
+        <td class="io">輸入第三拍 cue</td>
+        <td class="io">預期輸出 note area 中間座標。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreCueX_when_beat_is_outside_measure_then_clamps_to_note_bounds</code></td>
+        <td class="io">輸入小節外 beat</td>
+        <td class="io">預期 X 座標 clamp 在 note bounds。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="1"><code>tests/unit/ui/scorePdf.test.ts</code></td>
+        <td class="scope" rowspan="1">輸入 score title 與瀏覽器 print API stub；預期輸出列印行為與 title restore。</td>
+        <td class="count" rowspan="1">1</td>
+        <td class="function"><code>test_exportScoreAsPdf_when_called_then_prints_with_score_title_and_restores_page_title</code></td>
+        <td class="io">輸入 score title</td>
+        <td class="io">預期呼叫 print 並還原 page title。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="7"><code>tests/unit/ui/scoreSystems.test.ts</code></td>
+        <td class="scope" rowspan="7">輸入 score measures 與播放進度；預期輸出 systems、system progress 與 seek target。</td>
+        <td class="count" rowspan="7">7</td>
+        <td class="function"><code>test_groupScoreMeasures_when_measure_count_exceeds_system_size_then_groups_continuously</code></td>
+        <td class="io">輸入超過 system size 的小節</td>
+        <td class="io">預期連續分組。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_groupScoreMeasures_when_system_size_is_zero_then_returns_no_systems</code></td>
+        <td class="io">輸入 system size 0</td>
+        <td class="io">預期沒有 systems。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildScoreSystems_when_score_has_many_measures_then_uses_four_measures_per_system</code></td>
+        <td class="io">輸入多小節 score</td>
+        <td class="io">預期每 system 四小節。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreSystemProgress_when_position_is_inside_system_then_returns_relative_progress</code></td>
+        <td class="io">輸入 system 內播放位置</td>
+        <td class="io">預期輸出相對進度。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreSystemProgress_when_position_is_outside_system_then_clamps_progress</code></td>
+        <td class="io">輸入 system 外播放位置</td>
+        <td class="io">預期進度 clamp。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreSystemSeekTarget_when_progress_is_inside_system_then_maps_to_measure_position</code></td>
+        <td class="io">輸入 system 內進度</td>
+        <td class="io">預期映射到小節位置。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreSystemSeekTarget_when_progress_is_complete_then_maps_to_final_measure_end</code></td>
+        <td class="io">輸入完成進度</td>
+        <td class="io">預期映射到最後小節結尾。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="5"><code>tests/unit/workspace/persistence.test.ts</code></td>
+        <td class="scope" rowspan="5">輸入 localStorage snapshot；預期輸出 parsed workspace 或 persisted storage state。</td>
+        <td class="count" rowspan="5">5</td>
+        <td class="function"><code>test_parseChartWorkspaceSnapshot_when_serialized_snapshot_then_returns_workspace_state</code></td>
+        <td class="io">輸入 serialized snapshot</td>
+        <td class="io">預期回傳 workspace state。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChartWorkspaceSnapshot_when_raw_value_is_invalid_then_returns_null</code></td>
+        <td class="io">輸入非法 raw value</td>
+        <td class="io">預期回傳 null。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseChartWorkspaceSnapshot_when_json_shape_is_invalid_then_returns_null</code></td>
+        <td class="io">輸入 JSON shape 不合法</td>
+        <td class="io">預期回傳 null。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_persistChartWorkspaceSnapshot_when_workspace_has_content_then_saves_snapshot</code></td>
+        <td class="io">輸入有內容 workspace</td>
+        <td class="io">預期保存 snapshot。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_persistChartWorkspaceSnapshot_when_workspace_is_empty_then_removes_snapshot</code></td>
+        <td class="io">輸入空 workspace</td>
+        <td class="io">預期移除 snapshot。</td>
+      </tr>
+      <tr>
+        <td class="type" rowspan="21">Component</td>
+        <td class="file" rowspan="4"><code>tests/component/ArrangementGrid.test.ts</code></td>
+        <td class="scope" rowspan="4">輸入 arrangement、tempo 與使用者播放操作；預期 component render 正確並 emit 播放事件。</td>
+        <td class="count" rowspan="4">4</td>
+        <td class="function"><code>test_ArrangementGrid_when_play_is_clicked_then_plays_rich_version_at_source_tempo</code></td>
+        <td class="io">輸入 rich arrangement 與 source tempo</td>
+        <td class="io">預期點 play 後 emit rich version 與 source bpm。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ArrangementGrid_when_version_changes_then_stops_and_plays_selected_version</code></td>
+        <td class="io">輸入版本切換</td>
+        <td class="io">預期先 stop 再 play 新版本。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ArrangementGrid_when_tempo_changes_then_forwards_selected_version_and_bpm</code></td>
+        <td class="io">輸入 tempo 修改</td>
+        <td class="io">預期 emit 目前版本與新 bpm。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ArrangementGrid_when_arrangement_has_blocking_issue_then_hides_score_controls</code></td>
+        <td class="io">輸入有 blocking issue 的 arrangement</td>
+        <td class="io">預期不顯示 score controls。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="4"><code>tests/component/ChartComparison.test.ts</code></td>
+        <td class="scope" rowspan="4">輸入上傳圖片、選取 tab 與 disabled 狀態；預期 source panel 顯示與事件正確。</td>
+        <td class="count" rowspan="4">4</td>
+        <td class="function"><code>test_ChartComparison_when_image_tab_is_selected_then_displays_selected_image</code></td>
+        <td class="io">輸入多張圖片並選 tab</td>
+        <td class="io">預期顯示被選圖片。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ChartComparison_when_images_are_replaced_then_selects_first_image</code></td>
+        <td class="io">輸入替換圖片事件</td>
+        <td class="io">預期選到第一張新圖片。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ChartComparison_when_source_controls_are_used_then_emits_files_and_clear</code></td>
+        <td class="io">輸入 replace 與 clear 操作</td>
+        <td class="io">預期 emit files 與 clear。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ChartComparison_when_disabled_then_disables_destructive_source_controls</code></td>
+        <td class="io">輸入 disabled 狀態</td>
+        <td class="io">預期 destructive controls disabled。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="3"><code>tests/component/ChartReview.test.ts</code></td>
+        <td class="scope" rowspan="3">輸入 editor selection 與使用者編輯操作；預期 chart review UI 狀態與 confirm payload 正確。</td>
+        <td class="count" rowspan="3">3</td>
+        <td class="function"><code>test_ChartReview_when_measure_has_less_than_four_beats_then_disables_score_creation</code></td>
+        <td class="io">輸入未滿四拍小節</td>
+        <td class="io">預期 Create score disabled。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ChartReview_when_changes_are_undone_and_redone_then_restores_visible_lyric</code></td>
+        <td class="io">輸入歌詞修改後按 undo / redo</td>
+        <td class="io">預期可見歌詞被還原與重做。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ChartReview_when_chart_is_confirmed_then_emits_current_editor_selection</code></td>
+        <td class="io">輸入有效 chart 並 confirm</td>
+        <td class="io">預期 emit 目前 editor selection。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="4"><code>tests/component/PlaybackTempoControl.test.ts</code></td>
+        <td class="scope" rowspan="4">輸入 bpm value 與 disabled 狀態；預期 tempo input 顯示與 emit 行為正確。</td>
+        <td class="count" rowspan="4">4</td>
+        <td class="function"><code>test_PlaybackTempoControl_when_valid_bpm_is_typed_then_emits_bpm_immediately</code></td>
+        <td class="io">輸入合法 bpm</td>
+        <td class="io">預期立即 emit bpm。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PlaybackTempoControl_when_incomplete_bpm_is_typed_then_does_not_emit</code></td>
+        <td class="io">輸入未完成 bpm</td>
+        <td class="io">預期不 emit。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PlaybackTempoControl_when_committed_bpm_exceeds_maximum_then_emits_clamped_bpm</code></td>
+        <td class="io">輸入超過最大 bpm 並 commit</td>
+        <td class="io">預期 emit clamp 後 bpm。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PlaybackTempoControl_when_disabled_then_exposes_source_tempo_and_disables_input</code></td>
+        <td class="io">輸入 disabled 狀態</td>
+        <td class="io">預期顯示 source tempo 並禁用 input。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="3"><code>tests/component/StudioPage.test.ts</code></td>
+        <td class="scope" rowspan="3">輸入 workspace 狀態；預期 Studio page 在 upload、chart、score 三種狀態下 render 正確。</td>
+        <td class="count" rowspan="3">3</td>
+        <td class="function"><code>test_StudioPage_when_chart_is_unavailable_then_renders_upload_workspace</code></td>
+        <td class="io">輸入沒有 chart 的 workspace</td>
+        <td class="io">預期顯示 upload workspace。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_StudioPage_when_chart_has_no_score_then_renders_chart_and_disables_score_view</code></td>
+        <td class="io">輸入已有 chart 但無 score</td>
+        <td class="io">預期顯示 chart 並禁用 score view。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_StudioPage_when_chart_is_confirmed_then_switches_to_score_view</code></td>
+        <td class="io">輸入 confirm 後 chart</td>
+        <td class="io">預期切到 score view。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="3"><code>tests/component/UploadPanel.test.ts</code></td>
+        <td class="scope" rowspan="3">輸入 model options、檔案與 running 狀態；預期 upload panel 顯示、選 model、選檔與 stop 行為正確。</td>
+        <td class="count" rowspan="3">3</td>
+        <td class="function"><code>test_UploadPanel_when_models_are_available_then_renders_options_and_emits_selection</code></td>
+        <td class="io">輸入 model options</td>
+        <td class="io">預期 render options 並 emit 選取 model。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_UploadPanel_when_files_are_selected_then_emits_files_and_renders_names</code></td>
+        <td class="io">輸入選取檔案</td>
+        <td class="io">預期 emit files 並顯示檔名。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_UploadPanel_when_analysis_is_running_then_disables_model_and_emits_stop</code></td>
+        <td class="io">輸入 running 狀態</td>
+        <td class="io">預期 model disabled 並可 emit stop。</td>
+      </tr>
+      <tr>
+        <td class="type" rowspan="3">E2E</td>
+        <td class="file" rowspan="2"><code>tests/e2e/studio.spec.ts</code></td>
+        <td class="scope" rowspan="2">輸入 stubbed AI API response；預期完整瀏覽器流程可上傳、編輯、重試並產生 score。</td>
+        <td class="count" rowspan="2">2</td>
+        <td class="function"><code>test_studio_when_stubbed_chart_is_edited_then_sends_ordered_images_and_renders_score</code></td>
+        <td class="io">輸入兩張圖片與 stubbed chart</td>
+        <td class="io">預期 request 圖片排序正確，編輯後可 render score。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_studio_when_stubbed_stream_fails_then_shows_error_and_retries_successfully</code></td>
+        <td class="io">輸入第一次失敗、第二次成功的 stubbed stream</td>
+        <td class="io">預期先顯示錯誤，再 retry 成功。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="1"><code>tests/e2e/studio.live.spec.ts</code></td>
+        <td class="scope" rowspan="1">輸入 repo 內 `chord-charts/楓.jpeg` 與真實 AI API；預期完整 live 流程辨識、review 並產生 score。</td>
+        <td class="count" rowspan="1">1</td>
+        <td class="function"><code>test_studio_when_live_api_reads_feng_chart_then_renders_chart_and_score @live</code></td>
+        <td class="io">輸入 `楓.jpeg` 並呼叫真實 API</td>
+        <td class="io">預期標題為 `楓`，前六個和弦為 `Am`, `Em7`, `F`, `C`, `G/B`, `Am`，可建立並顯示 score。</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

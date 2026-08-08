@@ -1,0 +1,31 @@
+{
+  "name": "piano-accompaniment",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:live": "PLAYWRIGHT_LIVE=true playwright test --grep @live",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "nuxt": "^3.21.8",
+    "openai": "^6.48.0",
+    "vexflow": "^5.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@nuxt/test-utils": "^4.0.3",
+    "@playwright/test": "^1.62.0",
+    "@types/node": "^26.1.1",
+    "@vue/test-utils": "^2.4.11",
+    "happy-dom": "^20.11.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "vue-tsc": "^3.3.7"
+  }
+}
