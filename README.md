@@ -2,6 +2,10 @@
 
 Piano Accompaniment Studio uses AI to create editable, playable piano accompaniment scores.
 
+## Background
+
+Many songs are available only as guitar chord-sheet images. Converting them into piano accompaniment requires transcription, music theory, and arrangement work. This project uses AI to extract the chart, lets the user correct the result, and generates a simple score that can be played or exported.
+
 ## Goal
 
 The goal is to let users name a song, describe the accompaniment they want in natural language, and receive a piano score they can edit, play, and export without arranging it manually.
