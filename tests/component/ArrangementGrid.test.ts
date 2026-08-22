@@ -65,6 +65,35 @@ test('test_ArrangementGrid_when_version_changes_then_stops_and_plays_selected_ve
   )
 })
 
+test('test_ArrangementGrid_when_version_switcher_is_hidden_then_keeps_playback_controls', async () => {
+  // Arrange
+  const wrapper = await mountSuspended(ArrangementGrid, {
+    props: {
+      active: true,
+      arrangements: buildArrangementSet(),
+      chart: buildConfirmedChart(),
+      showVersionSwitcher: false,
+    },
+    global: {
+      stubs: {
+        PianoScore: {
+          template: '<div data-test="piano-score" />',
+        },
+      },
+    },
+  })
+
+  // Act
+  const versionSwitcher = wrapper.find('[aria-label="Arrangement versions"]')
+
+  // Assert
+  expect(versionSwitcher.exists()).toBe(false)
+  expect(wrapper.find('button.play').exists()).toBe(true)
+  expect(wrapper.find('button.stop').exists()).toBe(true)
+  expect(wrapper.find('input[aria-label="Score playback progress"]').exists()).toBe(true)
+  expect(wrapper.find('input[aria-label="Playback BPM"]').exists()).toBe(true)
+})
+
 test('test_ArrangementGrid_when_tempo_changes_then_forwards_selected_version_and_bpm', async () => {
   // Arrange
   const wrapper = await mountArrangementGrid()

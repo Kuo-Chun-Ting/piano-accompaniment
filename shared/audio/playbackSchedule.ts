@@ -1,4 +1,4 @@
-import type { ScoreVersion } from '../arrangement/types'
+import type { ScorePedalInterval, ScoreVersion } from '../arrangement/types'
 
 export const BEATS_PER_MEASURE = 4
 
@@ -35,18 +35,40 @@ export type PlaybackPosition = {
 
 export function buildPlaybackSchedule(version: ScoreVersion, bpm: number): PlaybackSchedule {
   const secondsPerBeat = 60 / bpm
-  const events = version.measures.flatMap((measure, measureIndex) =>
-    [
-      ...buildHandEvents(measure.rightHand, measureIndex, 'right', secondsPerBeat),
-      ...buildHandEvents(measure.leftHand, measureIndex, 'left', secondsPerBeat),
-    ],
-  )
+  const events = [
+    ...buildHandEvents(version.measures, 'right', secondsPerBeat),
+    ...buildHandEvents(version.measures, 'left', secondsPerBeat),
+  ]
+  applyPedalSustain(events, version.pedalIntervals ?? [], secondsPerBeat)
 
   return {
     events: events.sort((left, right) => left.startSeconds - right.startSeconds),
     totalDurationSeconds: version.measures.length * BEATS_PER_MEASURE * secondsPerBeat,
     secondsPerBeat,
     measureCount: version.measures.length,
+  }
+}
+
+function applyPedalSustain(
+  events: PlaybackEvent[],
+  intervals: ScorePedalInterval[],
+  secondsPerBeat: number,
+): void {
+  for (const event of events) {
+    if (event.pitches.length === 0) {
+      continue
+    }
+
+    const startBeatOffset = event.measureIndex * BEATS_PER_MEASURE + event.startBeat - 1
+    const endBeatOffset = startBeatOffset + event.durationBeats
+    const pedal = intervals.find(interval =>
+      interval.startBeatOffset <= endBeatOffset && endBeatOffset < interval.endBeatOffset)
+    if (!pedal) {
+      continue
+    }
+
+    event.durationBeats = pedal.endBeatOffset - startBeatOffset
+    event.durationSeconds = event.durationBeats * secondsPerBeat
   }
 }
 
@@ -92,20 +114,51 @@ export function retimePlaybackSeconds(
 }
 
 function buildHandEvents(
-  events: ScoreVersion['measures'][number]['rightHand'],
-  measureIndex: number,
+  measures: ScoreVersion['measures'],
   hand: PlaybackHand,
   secondsPerBeat: number,
 ): PlaybackEvent[] {
-  return events.map((event, eventIndex) => ({
-    id: `measure-${measureIndex}-${hand}-${eventIndex}`,
-    measureIndex,
-    hand,
-    eventIndex,
-    startBeat: event.startBeat,
-    durationBeats: event.durationBeats,
-    startSeconds: (measureIndex * BEATS_PER_MEASURE + event.startBeat - 1) * secondsPerBeat,
-    durationSeconds: event.durationBeats * secondsPerBeat,
-    pitches: event.pitches,
-  }))
+  const playbackEvents: PlaybackEvent[] = []
+  let previousWasTied = false
+
+  measures.forEach((measure, measureIndex) => {
+    const scoreEvents = hand === 'right' ? measure.rightHand : measure.leftHand
+
+    scoreEvents.forEach((event, eventIndex) => {
+      const playbackEvent: PlaybackEvent = {
+        id: `measure-${measureIndex}-${hand}-${eventIndex}`,
+        measureIndex,
+        hand,
+        eventIndex,
+        startBeat: event.startBeat,
+        durationBeats: event.durationBeats,
+        startSeconds: (measureIndex * BEATS_PER_MEASURE + event.startBeat - 1) * secondsPerBeat,
+        durationSeconds: event.durationBeats * secondsPerBeat,
+        pitches: event.pitches,
+      }
+      const previous = playbackEvents.at(-1)
+
+      if (previousWasTied
+        && event.tieFromPrevious === true
+        && previous
+        && canMergeTiedEvents(previous, playbackEvent)) {
+        previous.durationBeats += playbackEvent.durationBeats
+        previous.durationSeconds += playbackEvent.durationSeconds
+      } else {
+        playbackEvents.push(playbackEvent)
+      }
+
+      previousWasTied = event.tieToNext
+    })
+  })
+
+  return playbackEvents
+}
+
+function canMergeTiedEvents(previous: PlaybackEvent, next: PlaybackEvent): boolean {
+  const previousEndSeconds = previous.startSeconds + previous.durationSeconds
+  return previous.pitches.length > 0
+    && previous.pitches.length === next.pitches.length
+    && previous.pitches.every((pitch, index) => pitch === next.pitches[index])
+    && Math.abs(previousEndSeconds - next.startSeconds) < Number.EPSILON * 10
 }

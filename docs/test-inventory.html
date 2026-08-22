@@ -38,7 +38,7 @@
     </thead>
     <tbody>
       <tr>
-        <td class="type" rowspan="149">Unit</td>
+        <td class="type" rowspan="177">Unit</td>
         <td class="file" rowspan="10"><code>tests/unit/arrangement/generateArrangement.test.ts</code></td>
         <td class="scope" rowspan="10">輸入 confirmed chart 與 style；預期輸出可播放的伴奏 score、節拍事件、歌詞 cue 與錯誤資訊。</td>
         <td class="count" rowspan="10">10</td>
@@ -92,6 +92,182 @@
         <td class="io">預期輸出 blocking issue。</td>
       </tr>
       <tr>
+        <td class="file" rowspan="15"><code>tests/unit/audio-transcription/midiToScore.test.ts</code></td>
+        <td class="scope" rowspan="15">輸入轉錄音符、踏板事件、BPM、錄音長度、第一個強拍與偵測小節數；預期保留實際音符長度、完整尾奏、穩定分手、調號拼字，並輸出左右手四拍及踏板區間。</td>
+        <td class="count" rowspan="15">15</td>
+        <td class="function"><code>test_midiNumberToPitch_when_midi_number_is_valid_then_returns_scientific_pitch</code></td>
+        <td class="io">輸入 MIDI 40、60、61、84</td>
+        <td class="io">預期輸出 E2、C4、C#4、C6。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_note_is_short_then_quantizes_to_eighth_note</code></td>
+        <td class="io">輸入短於半拍的 C4</td>
+        <td class="io">預期量化為 0.5 拍事件。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_release_leaves_eighth_note_gap_then_preserves_rest</code></td>
+        <td class="io">輸入音符 release 與下一個 onset 之間的八分音符空隙</td>
+        <td class="io">預期保留八分休止符，不擅自延長前一音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_notes_start_together_then_builds_one_chord_event</code></td>
+        <td class="io">輸入同時開始的 C4、E4、G4</td>
+        <td class="io">預期組成一個右手和弦事件。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_sustained_note_overlaps_new_notes_then_preserves_active_pitch</code></td>
+        <td class="io">輸入延音中的 C6 與稍後按下的 E5、B5</td>
+        <td class="io">預期後續和弦與延續區段都保留仍在發聲的 C6。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_notes_are_above_middle_c_then_keeps_them_in_right_hand</code></td>
+        <td class="io">輸入中央 C 以上的兩個音</td>
+        <td class="io">預期兩音都穩定保留在右手。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_notes_cross_middle_c_then_keeps_register_boundary</code></td>
+        <td class="io">輸入中央 C 上下相鄰的音</td>
+        <td class="io">預期依中央 C 邊界穩定分入左右手。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_low_notes_exceed_hand_span_then_keeps_them_in_left_hand</code></td>
+        <td class="io">輸入跨度較大的低音</td>
+        <td class="io">預期低音不因手掌跨度規則被移到右手。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_notes_span_middle_c_then_splits_hands</code></td>
+        <td class="io">輸入中央 C 上下的音符</td>
+        <td class="io">預期依音域分入左右手。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_note_crosses_measure_then_marks_notation_segments_tied</code></td>
+        <td class="io">輸入跨越小節線的 C4</td>
+        <td class="io">預期兩小節都有音符且前段標記延音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_score_is_built_then_each_hand_fills_every_measure</code></td>
+        <td class="io">輸入跨兩小節的零散左右手音符</td>
+        <td class="io">預期每小節左右手事件各填滿四拍。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_first_downbeat_is_provided_then_aligns_score_origin</code></td>
+        <td class="io">輸入 0.5 秒第一強拍</td>
+        <td class="io">預期第一個音對齊第一小節第一拍。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_detected_measures_end_before_last_note_then_keeps_complete_transcription</code></td>
+        <td class="io">輸入只涵蓋兩小節的節拍偵測與落在第三小節的尾音</td>
+        <td class="io">預期擴充為三小節並保留尾音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_pedal_events_are_provided_then_aligns_interval_to_score_beats</code></td>
+        <td class="io">輸入第一強拍之後的 CC64 踏板事件</td>
+        <td class="io">預期轉成可隨 BPM 縮放的絕對拍點區間。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_notes_match_flat_key_then_adds_key_signature_and_flat_spelling</code></td>
+        <td class="io">輸入符合降 B 大調音階的音符</td>
+        <td class="io">預期輸出 Bb 調號，並以 Bb、Eb 拼寫對應音高。</td>
+      </tr>
+      <tr>
+        <td class="file"><code>tests/unit/audio-transcription/exportMidiNotes.test.ts</code></td>
+        <td class="scope">執行真實 Python 匯出腳本並隔離 mido；預期 MIDI CC64 不會在 JSON 邊界遺失。</td>
+        <td class="count">1</td>
+        <td class="function"><code>test_export_notes_when_midi_contains_sustain_control_changes_then_preserves_pedal_events</code></td>
+        <td class="io">輸入含 note 與 CC64 down/up 的 MIDI 訊息</td>
+        <td class="io">預期 notes.json 保留踏板時間與原始數值。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="2"><code>tests/unit/audio-transcription/pipeline.test.ts</code></td>
+        <td class="scope" rowspan="2">輸入音訊、輸出、Python、模型與專案路徑；預期輸出固定產物配置與不經 shell 拼接的模型命令。</td>
+        <td class="count" rowspan="2">2</td>
+        <td class="function"><code>test_resolveAudioScorePaths_when_output_has_spaces_then_returns_deterministic_layout</code></td>
+        <td class="io">輸入含空白的輸出目錄</td>
+        <td class="io">預期回傳固定且完整的產物路徑。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildAudioScorePipeline_when_paths_have_spaces_then_preserves_argument_boundaries</code></td>
+        <td class="io">輸入含空白的 WAV、Python、模型與專案路徑</td>
+        <td class="io">預期五階段命令保留獨立參數，並把 CA、Hugging Face 與 Torch 快取固定在內部 runtime。</td>
+      </tr>
+      <tr>
+        <td class="file"><code>tests/unit/audio-transcription/runtime.test.ts</code></td>
+        <td class="scope">輸入固定模型目錄；預期所有必要 checkpoint 都位於該目錄內。</td>
+        <td class="count">1</td>
+        <td class="function"><code>test_getRequiredModelArtifacts_when_runtime_is_fixed_then_keeps_every_model_inside_it</code></td>
+        <td class="io">輸入固定 runtime 的 models 路徑</td>
+        <td class="io">預期 BS-RoFormer、All-In-One 與 Torch checkpoint 都推導至同一 runtime。</td>
+      </tr>
+      <tr>
+        <td class="file"><code>tests/unit/audio-transcription/html.test.ts</code></td>
+        <td class="scope">輸入錄音檔名作為 HTML 標題；預期特殊字元安全顯示。</td>
+        <td class="count">1</td>
+        <td class="function"><code>test_escapeHtmlText_when_title_contains_markup_then_escapes_text_content</code></td>
+        <td class="io">輸入含 &amp; 與標籤字元的標題</td>
+        <td class="io">預期 escape 後作為純文字 HTML title。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="5"><code>tests/unit/audio-transcription/viewerData.test.ts</code></td>
+        <td class="scope" rowspan="5">輸入獨立 viewer 的標題、BPM 與 ScoreVersion payload；預期接受含踏板區間及調號的完整樂譜並拒絕無法渲染的資料。</td>
+        <td class="count" rowspan="5">5</td>
+        <td class="function"><code>test_parseViewerData_when_payload_is_valid_then_returns_typed_score</code></td>
+        <td class="io">輸入合法 viewer score payload</td>
+        <td class="io">預期回傳型別化資料。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseViewerData_when_tempo_is_invalid_then_throws_clear_error</code></td>
+        <td class="io">輸入 BPM 0</td>
+        <td class="io">預期拋出 viewer score data invalid。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseViewerData_when_measure_is_missing_hand_events_then_throws_clear_error</code></td>
+        <td class="io">輸入缺少左手事件的小節</td>
+        <td class="io">預期拋出 viewer score data invalid。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseViewerData_when_score_contains_pedal_intervals_then_preserves_them</code></td>
+        <td class="io">輸入含合法踏板拍點區間的 viewer payload</td>
+        <td class="io">預期 validation 後仍完整保留踏板資料。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseViewerData_when_score_contains_key_signature_then_preserves_it</code></td>
+        <td class="io">輸入含 Bb 調號的 viewer payload</td>
+        <td class="io">預期 validation 後仍完整保留調號。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="6"><code>tests/unit/audio-transcription/cli.test.ts</code></td>
+        <td class="scope" rowspan="6">唯一輸入 WAV 路徑；預期所有生成產物都放在隱藏工作目錄，自動推導固定 runtime 與標題，並拒絕其他參數或危險檔名。</td>
+        <td class="count" rowspan="6">6</td>
+        <td class="function"><code>test_parseAudioScoreArgs_when_input_is_missing_then_throws_usage_error</code></td>
+        <td class="io">未輸入 WAV 路徑</td>
+        <td class="io">預期顯示完整使用方式。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseAudioScoreArgs_when_input_is_not_wav_then_throws_format_error</code></td>
+        <td class="io">輸入 MP4 路徑</td>
+        <td class="io">預期拒絕非 WAV 格式。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseAudioScoreArgs_when_recording_is_provided_then_derives_all_internal_paths</code></td>
+        <td class="io">只輸入含空白的 WAV 相對路徑</td>
+        <td class="io">預期只推導內部工作目錄、runtime 與檔名標題，不建立根目錄 HTML 副本。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseAudioScoreArgs_when_device_is_omitted_on_mac_then_defaults_to_mps</code></td>
+        <td class="io">在 macOS 未指定裝置</td>
+        <td class="io">預期預設使用 MPS。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseAudioScoreArgs_when_any_second_argument_is_present_then_rejects_it</code></td>
+        <td class="io">輸入 WAV 後再加第二個參數</td>
+        <td class="io">預期拒絕並指出只接受一個 WAV 路徑。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseAudioScoreArgs_when_filename_has_no_usable_stem_then_rejects_it</code></td>
+        <td class="io">輸入會解析成上層目錄的特殊 WAV 檔名</td>
+        <td class="io">預期拒絕，避免工作產物離開隱藏輸出目錄。</td>
+      </tr>
+      <tr>
         <td class="file" rowspan="2"><code>tests/unit/audio/pianoSamples.test.ts</code></td>
         <td class="scope" rowspan="2">輸入音名與 sample catalog；預期輸出正規化 sample key 與完整 sample URL 清單。</td>
         <td class="count" rowspan="2">2</td>
@@ -105,12 +281,27 @@
         <td class="io">預期每個支援音高都有 URL。</td>
       </tr>
       <tr>
-        <td class="file" rowspan="7"><code>tests/unit/audio/playbackSchedule.test.ts</code></td>
-        <td class="scope" rowspan="7">輸入 score、播放秒數與 tempo；預期輸出播放排程、目前位置、seek 秒數與重計時結果。</td>
-        <td class="count" rowspan="7">7</td>
+        <td class="file" rowspan="10"><code>tests/unit/audio/playbackSchedule.test.ts</code></td>
+        <td class="scope" rowspan="10">輸入 score、踏板區間、播放秒數與 tempo；預期輸出包含延音的播放排程、目前位置、seek 秒數與重計時結果。</td>
+        <td class="count" rowspan="10">10</td>
         <td class="function"><code>test_buildPlaybackSchedule_when_score_has_two_measures_then_offsets_second_measure</code></td>
         <td class="io">輸入兩小節 score</td>
         <td class="io">預期第二小節事件時間正確位移。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildPlaybackSchedule_when_tied_note_crosses_measure_then_schedules_one_continuous_event</code></td>
+        <td class="io">輸入跨小節且標記延音的相同音高事件</td>
+        <td class="io">預期播放排程合併成一個連續事件。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildPlaybackSchedule_when_next_note_is_not_tied_from_previous_then_keeps_repeated_attack</code></td>
+        <td class="io">輸入前一音有向後延音、下一音沒有承接標記的重複音高</td>
+        <td class="io">預期保留兩次獨立擊鍵，不誤合併播放。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildPlaybackSchedule_when_note_releases_under_pedal_then_sustains_until_pedal_up</code></td>
+        <td class="io">輸入第一拍放鍵、第三拍才放踏板的 C4</td>
+        <td class="io">預期共用播放排程將 C4 延長到踏板放開。</td>
       </tr>
       <tr>
         <td class="function"><code>test_buildPlaybackPosition_when_playing_inside_measure_then_returns_measure_and_active_events</code></td>
@@ -871,10 +1062,10 @@
         <td class="io">預期移除 snapshot。</td>
       </tr>
       <tr>
-        <td class="type" rowspan="21">Component</td>
-        <td class="file" rowspan="4"><code>tests/component/ArrangementGrid.test.ts</code></td>
-        <td class="scope" rowspan="4">輸入 arrangement、tempo 與使用者播放操作；預期 component render 正確並 emit 播放事件。</td>
-        <td class="count" rowspan="4">4</td>
+        <td class="type" rowspan="24">Component</td>
+        <td class="file" rowspan="5"><code>tests/component/ArrangementGrid.test.ts</code></td>
+        <td class="scope" rowspan="5">輸入 arrangement、tempo、版本切換顯示設定與使用者播放操作；預期 component render 正確並 emit 播放事件。</td>
+        <td class="count" rowspan="5">5</td>
         <td class="function"><code>test_ArrangementGrid_when_play_is_clicked_then_plays_rich_version_at_source_tempo</code></td>
         <td class="io">輸入 rich arrangement 與 source tempo</td>
         <td class="io">預期點 play 後 emit rich version 與 source bpm。</td>
@@ -883,6 +1074,11 @@
         <td class="function"><code>test_ArrangementGrid_when_version_changes_then_stops_and_plays_selected_version</code></td>
         <td class="io">輸入版本切換</td>
         <td class="io">預期先 stop 再 play 新版本。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_ArrangementGrid_when_version_switcher_is_hidden_then_keeps_playback_controls</code></td>
+        <td class="io">輸入 showVersionSwitcher=false</td>
+        <td class="io">預期隱藏版本按鈕並保留播放、停止、進度與 BPM。</td>
       </tr>
       <tr>
         <td class="function"><code>test_ArrangementGrid_when_tempo_changes_then_forwards_selected_version_and_bpm</code></td>
@@ -934,6 +1130,34 @@
         <td class="function"><code>test_ChartReview_when_chart_is_confirmed_then_emits_current_editor_selection</code></td>
         <td class="io">輸入有效 chart 並 confirm</td>
         <td class="io">預期 emit 目前 editor selection。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="5"><code>tests/component/PianoScoreSystem.test.ts</code></td>
+        <td class="scope" rowspan="5">輸入含八分音符符槓、延音、雙手同拍、臨時記號與調號的 ScoreSystem；預期 VexFlow 正確對齊與渲染。</td>
+        <td class="count" rowspan="5">5</td>
+        <td class="function"><code>test_PianoScoreSystem_when_eighth_notes_are_beamed_then_does_not_render_flags_on_beamed_notes</code></td>
+        <td class="io">輸入連續八個八分音符</td>
+        <td class="io">預期有符槓且沒有殘留旗子。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PianoScoreSystem_when_note_is_tied_then_renders_stave_tie</code></td>
+        <td class="io">輸入兩個標記相連的相同音高事件</td>
+        <td class="io">預期 SVG 包含一條 VexFlow 延音線。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PianoScoreSystem_when_both_hands_share_a_beat_then_aligns_noteheads_horizontally</code></td>
+        <td class="io">輸入左右手同一拍開始的音符</td>
+        <td class="io">預期兩個音頭的水平位置一致。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PianoScoreSystem_when_accidental_repeats_in_measure_then_renders_it_once</code></td>
+        <td class="io">輸入同一小節內重複的升記號</td>
+        <td class="io">預期只在第一次出現時畫升記號。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PianoScoreSystem_when_key_signature_is_flat_then_renders_signature_without_note_accidental</code></td>
+        <td class="io">輸入 Bb 調號與 Bb 音符</td>
+        <td class="io">預期高低音譜表都畫調號，音符旁不重複畫降記號。</td>
       </tr>
       <tr>
         <td class="file" rowspan="4"><code>tests/component/PlaybackTempoControl.test.ts</code></td>
@@ -995,7 +1219,15 @@
         <td class="io">預期 model disabled 並可 emit stop。</td>
       </tr>
       <tr>
-        <td class="type" rowspan="3">E2E</td>
+        <td class="type" rowspan="4">E2E</td>
+        <td class="file" rowspan="1"><code>tests/e2e/audio-score-viewer.spec.ts</code></td>
+        <td class="scope" rowspan="1">預設即時建立 deterministic standalone 五線譜，也可輸入真實產物；預期 HTML 標題、VexFlow 幾何、符尾與延音線、播放、BPM、跳轉、停止在 Chromium 正常且不跳過。</td>
+        <td class="count" rowspan="1">1</td>
+        <td class="function"><code>generated audio score renders and plays with existing controls</code></td>
+        <td class="io">預設輸入含八分音符 beam、跨音延音與多系統的 fixture；可用 AUDIO_SCORE_VIEWER_PATH 改驗真實 MVP 產物</td>
+        <td class="io">預期檔名標題、五線譜、beam 與 tie 可見，沒有多餘旗標或幾何溢出；播放、跳轉與停止正常，且沒有 page error。</td>
+      </tr>
+      <tr>
         <td class="file" rowspan="2"><code>tests/e2e/studio.spec.ts</code></td>
         <td class="scope" rowspan="2">輸入 stubbed AI API response；預期完整瀏覽器流程可上傳、編輯、重試並產生 score。</td>
         <td class="count" rowspan="2">2</td>

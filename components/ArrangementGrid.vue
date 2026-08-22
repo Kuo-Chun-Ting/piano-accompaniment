@@ -9,11 +9,14 @@ import type { ConfirmedChart } from '~/shared/schemas/chart'
 import { formatElapsedTime } from '~/shared/ui/elapsedTime'
 import { exportScoreAsPdf } from '~/shared/ui/scorePdf'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   active: boolean
   arrangements: ArrangementSet | null
   chart: ConfirmedChart | null
-}>()
+  showVersionSwitcher?: boolean
+}>(), {
+  showVersionSwitcher: true,
+})
 
 const selectedLevel = ref<ArrangementLevelName>('rich')
 const scoreStage = ref<HTMLElement | null>(null)
@@ -206,7 +209,11 @@ function handleExportPdf(): void {
           @update:model-value="handleTempoChange"
         />
 
-        <div class="version-switcher" aria-label="Arrangement versions">
+        <div
+          v-if="props.showVersionSwitcher"
+          class="version-switcher"
+          aria-label="Arrangement versions"
+        >
           <button
             v-for="version in props.arrangements.versions"
             :key="version.level"

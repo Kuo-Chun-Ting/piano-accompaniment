@@ -9,9 +9,14 @@ import {
   Stave,
   StaveConnector,
   StaveNote,
+  StaveTie,
   Voice,
 } from 'vexflow'
-import type { ScoreEvent, ScoreLyricCue } from '~/shared/arrangement/types'
+import type {
+  ScoreEvent,
+  ScoreKeySignature,
+  ScoreLyricCue,
+} from '~/shared/arrangement/types'
 import {
   getScoreCueX,
   SCORE_SYSTEM_LAYOUT,
@@ -20,10 +25,18 @@ import type { ScoreSystem } from '~/shared/ui/scoreSystems'
 
 const props = defineProps<{
   system: ScoreSystem
+  keySignature?: ScoreKeySignature
 }>()
 
 const container = ref<HTMLDivElement | null>(null)
 let resizeObserver: ResizeObserver | null = null
+
+type RenderedVoice = {
+  events: ScoreEvent[]
+  notes: StaveNote[]
+  voice: Voice
+  beams: Beam[]
+}
 
 onMounted(() => {
   resizeObserver = new ResizeObserver(renderSystem)
@@ -52,19 +65,29 @@ function renderSystem(): void {
     const bass = new Stave(x, SCORE_SYSTEM_LAYOUT.bassStaveY, measureWidth)
 
     if (measureIndex === 0) {
-      treble.addClef('treble').addTimeSignature('4/4')
-      bass.addClef('bass').addTimeSignature('4/4')
+      treble.addClef('treble').addKeySignature(props.keySignature ?? 'C').addTimeSignature('4/4')
+      bass.addClef('bass').addKeySignature(props.keySignature ?? 'C').addTimeSignature('4/4')
     }
 
     treble.setContext(context).draw()
     bass.setContext(context).draw()
-    drawVoice(context, treble, measure.rightHand, 'treble', measureWidth, measureIndex === 0)
-    drawVoice(context, bass, measure.leftHand, 'bass', measureWidth, measureIndex === 0)
+    const { trebleVoice, bassVoice } = drawGrandStaffVoices(
+      context,
+      treble,
+      bass,
+      measure.rightHand,
+      measure.leftHand,
+      measureWidth,
+      measureIndex === 0,
+    )
     drawChordSymbols(context, treble, measure.rightHand, measureWidth, x)
     drawLyrics(context, bass, measure.lyrics, measureWidth, x)
 
-    return { treble, bass }
+    return { treble, bass, trebleVoice, bassVoice }
   })
+
+  drawVoiceTies(context, staves.map(stave => stave.trebleVoice))
+  drawVoiceTies(context, staves.map(stave => stave.bassVoice))
 
   const first = staves[0]
   const last = staves.at(-1)
@@ -133,20 +156,100 @@ function drawConnector(
   new StaveConnector(treble, bass).setType(type).setContext(context).draw()
 }
 
-function drawVoice(
+function drawGrandStaffVoices(
   context: ReturnType<Renderer['getContext']>,
-  stave: Stave,
-  events: ScoreEvent[],
-  clef: 'treble' | 'bass',
+  treble: Stave,
+  bass: Stave,
+  rightHand: ScoreEvent[],
+  leftHand: ScoreEvent[],
   staveWidth: number,
   isFirstMeasure: boolean,
-): void {
+): { trebleVoice: RenderedVoice, bassVoice: RenderedVoice } {
+  const trebleVoice = buildRenderedVoice(rightHand, 'treble')
+  const bassVoice = buildRenderedVoice(leftHand, 'bass')
+  Accidental.applyAccidentals([trebleVoice.voice], props.keySignature ?? 'C')
+  Accidental.applyAccidentals([bassVoice.voice], props.keySignature ?? 'C')
+  const voices = [trebleVoice.voice, bassVoice.voice]
+  const formatter = new Formatter()
+    .joinVoices([trebleVoice.voice])
+    .joinVoices([bassVoice.voice])
+  const formattingWidth = Math.max(staveWidth - (isFirstMeasure ? 90 : 28), 100)
+  formatter.format(voices, formattingWidth)
+
+  drawRenderedVoice(context, treble, trebleVoice)
+  drawRenderedVoice(context, bass, bassVoice)
+  return { trebleVoice, bassVoice }
+}
+
+function buildRenderedVoice(events: ScoreEvent[], clef: 'treble' | 'bass'): RenderedVoice {
   const notes = events.map(event => buildStaveNote(event, clef))
   const voice = new Voice({ numBeats: 4, beatValue: 4 }).addTickables(notes)
-  const formattingWidth = Math.max(staveWidth - (isFirstMeasure ? 90 : 28), 100)
-  new Formatter().joinVoices([voice]).format([voice], formattingWidth)
-  voice.draw(context, stave)
-  Beam.generateBeams(notes).forEach(beam => beam.setContext(context).draw())
+  const beams = Beam.generateBeams(notes)
+  return { events, notes, voice, beams }
+}
+
+function drawRenderedVoice(
+  context: ReturnType<Renderer['getContext']>,
+  stave: Stave,
+  renderedVoice: RenderedVoice,
+): void {
+  renderedVoice.voice.draw(context, stave)
+  renderedVoice.beams.forEach(beam => beam.setContext(context).draw())
+}
+
+function drawVoiceTies(
+  context: ReturnType<Renderer['getContext']>,
+  voices: RenderedVoice[],
+): void {
+  const renderedEvents = voices.flatMap(voice => voice.events.map((event, index) => ({
+    event,
+    note: voice.notes[index]!,
+  })))
+
+  renderedEvents.forEach(({ event, note }, index) => {
+    if (event.pitches.length === 0) {
+      return
+    }
+
+    const previous = renderedEvents[index - 1]
+    const next = renderedEvents[index + 1]
+    const indexes = event.pitches.map((_, pitchIndex) => pitchIndex)
+    const hasConnectedPrevious = event.tieFromPrevious
+      && previous?.event.tieToNext
+      && samePitches(previous.event.pitches, event.pitches)
+
+    if (event.tieFromPrevious && !hasConnectedPrevious) {
+      drawTie(context, undefined, note, indexes)
+    }
+
+    if (!event.tieToNext) {
+      return
+    }
+
+    const connectedNext = next?.event.tieFromPrevious
+      && samePitches(event.pitches, next.event.pitches)
+      ? next.note
+      : undefined
+    drawTie(context, note, connectedNext, indexes)
+  })
+}
+
+function drawTie(
+  context: ReturnType<Renderer['getContext']>,
+  firstNote: StaveNote | undefined,
+  lastNote: StaveNote | undefined,
+  indexes: number[],
+): void {
+  new StaveTie({
+    firstNote,
+    lastNote,
+    firstIndexes: indexes,
+    lastIndexes: indexes,
+  }).setContext(context).draw()
+}
+
+function samePitches(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((pitch, index) => pitch === right[index])
 }
 
 function buildStaveNote(event: ScoreEvent, clef: 'treble' | 'bass'): StaveNote {
@@ -159,12 +262,7 @@ function buildStaveNote(event: ScoreEvent, clef: 'treble' | 'bass'): StaveNote {
   })
 
   if (!isRest) {
-    keys.forEach((key, index) => {
-      const accidental = key.match(/([#b])\//)?.[1]
-      if (accidental) {
-        note.addModifier(new Accidental(accidental), index)
-      }
-
+    keys.forEach((_, index) => {
       const finger = event.fingers[index]
       if (finger) {
         note.addModifier(
@@ -189,7 +287,7 @@ function toVexPitch(pitch: string): string {
 }
 
 function toVexDuration(durationBeats: number): string {
-  const duration = { 2: 'h', 1: 'q', 0.5: '8' }[durationBeats]
+  const duration = { 4: 'w', 2: 'h', 1: 'q', 0.5: '8' }[durationBeats]
   if (!duration) {
     throw new Error(`Unsupported score duration: ${durationBeats}`)
   }

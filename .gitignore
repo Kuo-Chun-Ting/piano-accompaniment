@@ -4,6 +4,10 @@ node_modules
 .nuxt
 .nuxt-e2e
 .output
+audio-score-output/
+.audio-score/
+.audio-score-venv/
+.audio-score-models/
 test-results
 playwright-report
 .data

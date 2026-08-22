@@ -2,6 +2,9 @@ import type { Mood } from '../schemas/chart'
 
 export type ArrangementLevelName = 'easy' | 'rich'
 export type MeasureIntensity = 'soft' | 'medium' | 'strong'
+export type ScoreKeySignature =
+  | 'C' | 'G' | 'D' | 'A' | 'E' | 'B' | 'F#' | 'C#'
+  | 'F' | 'Bb' | 'Eb' | 'Ab' | 'Db' | 'Gb' | 'Cb'
 
 export type ScoreEvent = {
   startBeat: number
@@ -9,6 +12,7 @@ export type ScoreEvent = {
   pitches: string[]
   fingers: number[]
   tieToNext: boolean
+  tieFromPrevious?: boolean
   chordSymbol?: string
 }
 
@@ -28,9 +32,16 @@ export type ScoreMeasure = {
   leftHand: ScoreEvent[]
 }
 
+export type ScorePedalInterval = {
+  startBeatOffset: number
+  endBeatOffset: number
+}
+
 export type ScoreVersion = {
   level: ArrangementLevelName
   measures: ScoreMeasure[]
+  keySignature?: ScoreKeySignature
+  pedalIntervals?: ScorePedalInterval[]
 }
 
 export type ArrangementSet = {

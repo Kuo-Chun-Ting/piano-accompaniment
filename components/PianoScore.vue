@@ -124,7 +124,10 @@ function isVisible(element: HTMLElement): boolean {
         @pointerdown.stop
         @change="handleSeek($event, systemIndex)"
       >
-      <PianoScoreSystem :system="system" />
+      <PianoScoreSystem
+        :system="system"
+        :key-signature="props.version.keySignature"
+      />
     </article>
   </div>
 </template>

@@ -59,6 +59,71 @@ test('test_buildPlaybackSchedule_when_score_has_two_measures_then_offsets_second
   expect(schedule.totalDurationSeconds).toBe(4)
 })
 
+test('test_buildPlaybackSchedule_when_tied_note_crosses_measure_then_schedules_one_continuous_event', () => {
+  // Arrange
+  const version = buildScoreVersion([
+    buildMeasure([
+      buildEvent(1, 2, []),
+      buildEvent(3, 2, ['C4'], true),
+    ], []),
+    buildMeasure([
+      buildEvent(1, 2, ['C4'], false, true),
+      buildEvent(3, 2, []),
+    ], []),
+  ])
+
+  // Act
+  const schedule = buildPlaybackSchedule(version, 120)
+
+  // Assert
+  expect(schedule.events.filter(event => event.pitches.length > 0)).toEqual([{
+    id: 'measure-0-right-1',
+    measureIndex: 0,
+    hand: 'right',
+    eventIndex: 1,
+    startBeat: 3,
+    durationBeats: 4,
+    startSeconds: 1,
+    durationSeconds: 2,
+    pitches: ['C4'],
+  }])
+})
+
+test('test_buildPlaybackSchedule_when_next_note_is_not_tied_from_previous_then_keeps_repeated_attack', () => {
+  // Arrange
+  const version = buildScoreVersion([
+    buildMeasure([
+      buildEvent(1, 2, ['C4'], true),
+      buildEvent(3, 2, ['C4']),
+    ], []),
+  ])
+
+  // Act
+  const schedule = buildPlaybackSchedule(version, 120)
+
+  // Assert
+  expect(schedule.events.filter(event => event.pitches.length > 0)).toHaveLength(2)
+})
+
+test('test_buildPlaybackSchedule_when_note_releases_under_pedal_then_sustains_until_pedal_up', () => {
+  // Arrange
+  const version: ScoreVersion = {
+    ...buildScoreVersion([
+      buildMeasure([buildEvent(1, 1, ['C4'])], []),
+    ]),
+    pedalIntervals: [{ startBeatOffset: 0.5, endBeatOffset: 3 }],
+  }
+
+  // Act
+  const schedule = buildPlaybackSchedule(version, 60)
+
+  // Assert
+  expect(schedule.events.find(event => event.pitches.length > 0)).toMatchObject({
+    durationBeats: 3,
+    durationSeconds: 3,
+  })
+})
+
 test('test_buildPlaybackPosition_when_playing_inside_measure_then_returns_measure_and_active_events', () => {
   // Arrange
   const schedule = buildPlaybackSchedule(buildScoreVersion([
@@ -165,12 +230,19 @@ function buildMeasure(rightHand: ScoreEvent[], leftHand: ScoreEvent[]): ScoreMea
   }
 }
 
-function buildEvent(startBeat: number, durationBeats: number, pitches: string[]): ScoreEvent {
+function buildEvent(
+  startBeat: number,
+  durationBeats: number,
+  pitches: string[],
+  tieToNext = false,
+  tieFromPrevious = false,
+): ScoreEvent {
   return {
     startBeat,
     durationBeats,
     pitches,
     fingers: [],
-    tieToNext: false,
+    tieToNext,
+    ...(tieFromPrevious ? { tieFromPrevious } : {}),
   }
 }
