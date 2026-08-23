@@ -1,10 +1,16 @@
 import type {
   ScoreEvent,
+  ScoreLyricCue,
   ScoreMeasure,
   ScorePedalInterval,
   ScoreVersion,
 } from '../arrangement/types'
-import type { TranscribedNote, TranscribedPedalEvent, TranscriptionInput } from './types'
+import type {
+  TranscribedLyricSegment,
+  TranscribedNote,
+  TranscribedPedalEvent,
+  TranscriptionInput,
+} from './types'
 import { inferKeySignature, type PitchSpelling } from './keySignature'
 
 const BEATS_PER_MEASURE = 4
@@ -21,7 +27,7 @@ type QuantizedNote = {
 }
 
 type ScoreGridCell = {
-  attack: boolean
+  attacks: Set<number>
   pitches: Set<number>
 }
 
@@ -44,20 +50,150 @@ export function convertTranscriptionToScore(input: TranscriptionInput): ScoreVer
   const leftGrid = buildHandGrid(leftGroups, totalCells)
   const rightGrid = buildHandGrid(rightGroups, totalCells)
   const keySignature = inferKeySignature(input.notes)
+  const playbackNotes = buildPlaybackNotes(
+    input.notes,
+    input.bpm,
+    originSeconds,
+    measureCount * BEATS_PER_MEASURE,
+    keySignature.spelling,
+  )
   const pedalIntervals = buildPedalIntervals(
     input.pedalEvents ?? [],
     input.bpm,
     originSeconds,
     measureCount * BEATS_PER_MEASURE,
   )
+  const lyricsByMeasure = buildLyricsByMeasure(
+    input.lyricSegments ?? [],
+    input.bpm,
+    originSeconds,
+    measureCount,
+    input.downbeatSeconds,
+  )
 
   return {
     level: 'rich',
     keySignature: keySignature.name,
+    playbackNotes,
     measures: Array.from({ length: measureCount }, (_, measureIndex) =>
-      buildMeasure(measureIndex, leftGrid, rightGrid, keySignature.spelling)),
+      buildMeasure(
+        measureIndex,
+        leftGrid,
+        rightGrid,
+        keySignature.spelling,
+        lyricsByMeasure.get(measureIndex) ?? [],
+      )),
     ...(pedalIntervals.length > 0 ? { pedalIntervals } : {}),
   }
+}
+
+function buildPlaybackNotes(
+  notes: TranscribedNote[],
+  bpm: number,
+  originSeconds: number,
+  totalBeats: number,
+  spelling: PitchSpelling,
+) {
+  return notes.flatMap((note) => {
+    if (!isValidNote(note) || note.endSeconds <= originSeconds) {
+      return []
+    }
+
+    const startBeatOffset = Math.max(0, (note.startSeconds - originSeconds) * bpm / 60)
+    const endBeatOffset = Math.min(totalBeats, (note.endSeconds - originSeconds) * bpm / 60)
+    if (startBeatOffset >= totalBeats || endBeatOffset <= startBeatOffset) {
+      return []
+    }
+
+    return [{
+      pitch: midiNumberToPitch(note.midi, spelling),
+      startBeatOffset,
+      durationBeats: endBeatOffset - startBeatOffset,
+      velocity: note.velocity,
+    }]
+  })
+}
+
+function buildLyricsByMeasure(
+  segments: TranscribedLyricSegment[],
+  bpm: number,
+  originSeconds: number,
+  measureCount: number,
+  downbeatSeconds: number[] | undefined,
+): Map<number, ScoreLyricCue[]> {
+  const result = new Map<number, ScoreLyricCue[]>()
+
+  for (const segment of [...segments].sort((left, right) => left.startSeconds - right.startSeconds)) {
+    const text = segment.text.trim()
+    const position = locateLyricPosition(
+      segment.startSeconds,
+      bpm,
+      originSeconds,
+      measureCount,
+      downbeatSeconds,
+    )
+    if (!text
+      || !Number.isFinite(segment.startSeconds)
+      || !Number.isFinite(segment.endSeconds)
+      || segment.endSeconds <= segment.startSeconds
+      || !position) {
+      continue
+    }
+
+    const cues = result.get(position.measureIndex) ?? []
+    cues.push({
+      startBeat: position.startBeat,
+      text,
+    })
+    result.set(position.measureIndex, cues)
+  }
+
+  return result
+}
+
+function locateLyricPosition(
+  startSeconds: number,
+  bpm: number,
+  originSeconds: number,
+  measureCount: number,
+  downbeatSeconds: number[] | undefined,
+): { measureIndex: number, startBeat: number } | null {
+  if (!Number.isFinite(startSeconds) || startSeconds < originSeconds) {
+    return null
+  }
+
+  const detectedMeasureIndex = downbeatSeconds
+    ? findLatestTimeIndex(downbeatSeconds, startSeconds)
+    : 0
+  if (detectedMeasureIndex < 0) {
+    return null
+  }
+
+  const measureStartSeconds = downbeatSeconds?.[detectedMeasureIndex] ?? originSeconds
+  const nextMeasureSeconds = downbeatSeconds?.[detectedMeasureIndex + 1]
+  const beatOffset = nextMeasureSeconds === undefined
+    ? (startSeconds - measureStartSeconds) * bpm / 60
+    : (startSeconds - measureStartSeconds) / (nextMeasureSeconds - measureStartSeconds)
+      * BEATS_PER_MEASURE
+  const quantizedBeatOffset = Math.round(beatOffset * CELLS_PER_BEAT) / CELLS_PER_BEAT
+  const measureIndex = detectedMeasureIndex
+    + Math.floor(quantizedBeatOffset / BEATS_PER_MEASURE)
+  if (measureIndex >= measureCount) {
+    return null
+  }
+
+  return {
+    measureIndex,
+    startBeat: 1 + quantizedBeatOffset % BEATS_PER_MEASURE,
+  }
+}
+
+function findLatestTimeIndex(times: number[], target: number): number {
+  let result = -1
+  for (let index = 0; index < times.length && times[index]! <= target; index += 1) {
+    result = index
+  }
+  return result
 }
 
 export function midiNumberToPitch(midi: number, spelling: PitchSpelling = 'sharp'): string {
@@ -246,13 +382,14 @@ function findBestHandSplit(notes: QuantizedNote[]): number {
 
 function buildHandGrid(onsetGroups: OnsetGroups, totalCells: number): ScoreGridCell[] {
   const grid = Array.from({ length: totalCells }, (): ScoreGridCell => ({
-    attack: false,
+    attacks: new Set<number>(),
     pitches: new Set<number>(),
   }))
+
   for (const [startCell, notes] of onsetGroups) {
     for (const note of notes) {
+      grid[startCell]!.attacks.add(note.midi)
       for (let cellIndex = startCell; cellIndex < note.endCell; cellIndex += 1) {
-        grid[cellIndex]!.attack ||= cellIndex === startCell
         grid[cellIndex]!.pitches.add(note.midi)
       }
     }
@@ -266,13 +403,14 @@ function buildMeasure(
   leftGrid: ScoreGridCell[],
   rightGrid: ScoreGridCell[],
   spelling: PitchSpelling,
+  lyrics: ScoreLyricCue[],
 ): ScoreMeasure {
   return {
     sectionId: 'transcription',
     sectionLabel: 'Transcription',
     index: measureIndex + 1,
     chordSymbols: [],
-    lyrics: [],
+    lyrics,
     intensity: 'medium',
     leftHand: buildMeasureEvents(leftGrid, measureIndex, spelling),
     rightHand: buildMeasureEvents(rightGrid, measureIndex, spelling),
@@ -294,7 +432,7 @@ function buildMeasureEvents(
     let runEnd = cellIndex + 1
 
     while (runEnd < measureEnd
-      && !grid[runEnd]?.attack
+      && grid[runEnd]?.attacks.size === 0
       && samePitches(pitches, sortedPitches(grid[runEnd]?.pitches))) {
       runEnd += 1
     }
@@ -303,20 +441,27 @@ function buildMeasureEvents(
     while (remainingCells > 0) {
       const durationCells = nextSupportedDuration(remainingCells)
       const eventEnd = cellIndex + durationCells
-      const continuesFromPrevious = pitches.length > 0
-        && !grid[cellIndex]?.attack
-        && samePitches(pitches, sortedPitches(grid[cellIndex - 1]?.pitches))
-      const continuesToNext = pitches.length > 0
-        && !grid[eventEnd]?.attack
-        && samePitches(pitches, sortedPitches(grid[eventEnd]?.pitches))
+      const previousPitches = grid[cellIndex - 1]?.pitches
+      const nextPitches = grid[eventEnd]?.pitches
+      const tieFromPrevious = pitches.filter(pitch =>
+        previousPitches?.has(pitch) && !grid[cellIndex]?.attacks.has(pitch))
+      const tieToNext = pitches.filter(pitch =>
+        nextPitches?.has(pitch) && !grid[eventEnd]?.attacks.has(pitch))
+      const spelledPitches = pitches.map(midi => midiNumberToPitch(midi, spelling))
+      const tieFromPreviousPitches = tieFromPrevious.map(midi => midiNumberToPitch(midi, spelling))
+      const tieToNextPitches = tieToNext.map(midi => midiNumberToPitch(midi, spelling))
 
       events.push({
         startBeat: 1 + (cellIndex - measureStart) / CELLS_PER_BEAT,
         durationBeats: durationCells / CELLS_PER_BEAT,
-        pitches: pitches.map(midi => midiNumberToPitch(midi, spelling)),
+        pitches: spelledPitches,
         fingers: [],
-        tieToNext: continuesToNext,
-        ...(continuesFromPrevious ? { tieFromPrevious: true } : {}),
+        tieToNext: tieToNext.length === pitches.length && pitches.length > 0,
+        ...(tieFromPrevious.length === pitches.length && pitches.length > 0
+          ? { tieFromPrevious: true }
+          : {}),
+        ...(tieFromPreviousPitches.length > 0 ? { tieFromPreviousPitches } : {}),
+        ...(tieToNextPitches.length > 0 ? { tieToNextPitches } : {}),
       })
 
       cellIndex = eventEnd

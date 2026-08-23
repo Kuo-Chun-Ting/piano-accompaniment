@@ -12,6 +12,7 @@ import {
 } from '../shared/audio-transcription/pipeline'
 import { getRequiredModelArtifacts } from '../shared/audio-transcription/runtime'
 import type {
+  TranscribedLyricSegment,
   TranscribedNote,
   TranscribedPedalEvent,
 } from '../shared/audio-transcription/types'
@@ -31,6 +32,12 @@ type StructureFile = {
   bpm: number
   beats: number[]
   downbeats: number[]
+}
+
+type LyricsFile = {
+  language: string
+  languageProbability: number
+  segments: TranscribedLyricSegment[]
 }
 
 type StageResult = {
@@ -90,13 +97,16 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
   await copyFile(paths.pianoStem, paths.pianoAudio)
   const notesFile = parseMidiNotes(await readJson(paths.notes))
   const structureFile = parseStructure(await readJson(paths.structure))
+  const lyricsFile = parseLyrics(await readJson(paths.lyrics))
   const firstDownbeatSeconds = structureFile.downbeats[0] ?? structureFile.beats[0] ?? 0
   const version = convertTranscriptionToScore({
     notes: notesFile.notes,
     pedalEvents: notesFile.pedalEvents,
+    lyricSegments: lyricsFile.segments,
     bpm: structureFile.bpm,
     durationSeconds: notesFile.durationSeconds,
     firstDownbeatSeconds,
+    downbeatSeconds: structureFile.downbeats,
     measureCount: structureFile.downbeats.length || undefined,
   })
   const scoreData = parseViewerData({
@@ -134,6 +144,9 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
     midiNotes: notesFile.notes.length,
     pedalEvents: notesFile.pedalEvents.length,
     pedalIntervals: version.pedalIntervals?.length ?? 0,
+    lyricLanguage: lyricsFile.language,
+    lyricLanguageProbability: lyricsFile.languageProbability,
+    lyricSegments: lyricsFile.segments.length,
     renderedNoteEvents: renderedNoteEvents.length,
     midiValidation: notesFile.validation,
     stages,
@@ -213,6 +226,25 @@ function parseStructure(value: unknown): StructureFile {
     throw new Error('Beat analysis is invalid')
   }
   return candidate as StructureFile
+}
+
+function parseLyrics(value: unknown): LyricsFile {
+  const candidate = value as Partial<LyricsFile>
+  if (typeof candidate.language !== 'string'
+    || !Number.isFinite(candidate.languageProbability)
+    || !Array.isArray(candidate.segments)
+    || candidate.segments.some(segment => !isValidLyricSegment(segment))) {
+    throw new Error('Lyric transcription is invalid')
+  }
+  return candidate as LyricsFile
+}
+
+function isValidLyricSegment(segment: TranscribedLyricSegment): boolean {
+  return Number.isFinite(segment.startSeconds)
+    && Number.isFinite(segment.endSeconds)
+    && segment.endSeconds > segment.startSeconds
+    && typeof segment.text === 'string'
+    && segment.text.trim().length > 0
 }
 
 function isIncreasingNumberArray(value: unknown): value is number[] {

@@ -53,6 +53,44 @@ test('test_PianoScoreSystem_when_note_is_tied_then_renders_stave_tie', async () 
   expect(wrapper.findAll('.vf-stavetie')).toHaveLength(1)
 })
 
+test('test_PianoScoreSystem_when_one_chord_pitch_continues_then_renders_partial_ties', async () => {
+  // Arrange
+  const notes = [
+    { ...buildEvent(1, 1, ['C6']), tieToNextPitches: ['C6'] },
+    {
+      ...buildEvent(2, 1, ['E5', 'B5', 'C6']),
+      tieFromPreviousPitches: ['C6'],
+      tieToNextPitches: ['C6'],
+    },
+    { ...buildEvent(3, 1, ['C6']), tieFromPreviousPitches: ['C6'] },
+    buildEvent(4, 1, []),
+  ]
+
+  // Act
+  const wrapper = mount(PianoScoreSystem, {
+    props: { system: buildSystem(notes) },
+  })
+  await nextTick()
+
+  // Assert
+  expect(wrapper.findAll('.vf-stavetie')).toHaveLength(2)
+})
+
+test('test_PianoScoreSystem_when_pedal_interval_is_visible_then_renders_pedal_symbols', async () => {
+  // Arrange & Act
+  const wrapper = mount(PianoScoreSystem, {
+    props: {
+      system: buildSystem([buildEvent(1, 4, ['C4'])]),
+      pedalIntervals: [{ startBeatOffset: 0.5, endBeatOffset: 3 }],
+    },
+  })
+  await nextTick()
+
+  // Assert
+  expect(wrapper.text()).toContain('Ped.')
+  expect(wrapper.text()).toContain('✱')
+})
+
 test('test_PianoScoreSystem_when_both_hands_share_a_beat_then_aligns_noteheads_horizontally', async () => {
   // Arrange
   const rightHand = [

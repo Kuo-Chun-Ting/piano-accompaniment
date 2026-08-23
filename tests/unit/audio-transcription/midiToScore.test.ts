@@ -66,7 +66,7 @@ describe('midiToScore', () => {
     expect(result.measures[0]?.rightHand[0]?.pitches).toEqual(['C4', 'E4', 'G4'])
   })
 
-  test('test_convertTranscriptionToScore_when_sustained_note_overlaps_new_notes_then_preserves_active_pitch', () => {
+  test('test_convertTranscriptionToScore_when_sustained_note_overlaps_new_onset_then_marks_partial_ties', () => {
     // Arrange
     const input = buildInput([
       { midi: 84, startSeconds: 0, endSeconds: 1.5, velocity: 80 },
@@ -79,9 +79,25 @@ describe('midiToScore', () => {
 
     // Assert
     expect(result.measures[0]?.rightHand.filter(event => event.pitches.length > 0)).toEqual([
-      expect.objectContaining({ startBeat: 1, pitches: ['C6'] }),
-      expect.objectContaining({ startBeat: 2, pitches: ['E5', 'B5', 'C6'] }),
-      expect.objectContaining({ startBeat: 3, pitches: ['C6'] }),
+      expect.objectContaining({
+        startBeat: 1,
+        durationBeats: 1,
+        pitches: ['C6'],
+        tieToNextPitches: ['C6'],
+      }),
+      expect.objectContaining({
+        startBeat: 2,
+        durationBeats: 1,
+        pitches: ['E5', 'B5', 'C6'],
+        tieFromPreviousPitches: ['C6'],
+        tieToNextPitches: ['C6'],
+      }),
+      expect.objectContaining({
+        startBeat: 3,
+        durationBeats: 1,
+        pitches: ['C6'],
+        tieFromPreviousPitches: ['C6'],
+      }),
     ])
   })
 
@@ -98,6 +114,27 @@ describe('midiToScore', () => {
     // Assert
     expect(result.measures[0]?.leftHand[0]?.pitches).toEqual([])
     expect(result.measures[0]?.rightHand[0]?.pitches).toEqual(['C4', 'C6'])
+  })
+
+  test('test_convertTranscriptionToScore_when_note_has_precise_timing_then_preserves_playback_note', () => {
+    // Arrange
+    const input = {
+      ...buildInput([
+        { midi: 60, startSeconds: 1.25, endSeconds: 2.1, velocity: 83 },
+      ], 4, 1),
+      bpm: 60,
+    }
+
+    // Act
+    const result = convertTranscriptionToScore(input)
+
+    // Assert
+    expect(result.playbackNotes).toEqual([{
+      pitch: 'C4',
+      startBeatOffset: 0.25,
+      durationBeats: expect.closeTo(0.85),
+      velocity: 83,
+    }])
   })
 
   test('test_convertTranscriptionToScore_when_notes_cross_middle_c_then_keeps_register_boundary', () => {
@@ -267,6 +304,76 @@ describe('midiToScore', () => {
     expect(result.keySignature).toBe('Bb')
     expect(pitches).toContain('Bb3')
     expect(pitches).toContain('Eb4')
+  })
+
+  test('test_convertTranscriptionToScore_when_lyric_starts_after_downbeat_then_places_it_in_matching_measure', () => {
+    // Arrange
+    const input = {
+      ...buildInput([
+        { midi: 60, startSeconds: 1, endSeconds: 1.5, velocity: 80 },
+      ], 6, 1),
+      lyricSegments: [{
+        startSeconds: 3.25,
+        endSeconds: 4,
+        text: '只剩下鋼琴陪我談了一天',
+      }],
+    }
+
+    // Act
+    const result = convertTranscriptionToScore(input)
+
+    // Assert
+    expect(result.measures[0]?.lyrics).toEqual([])
+    expect(result.measures[1]?.lyrics).toEqual([{
+      startBeat: 1.5,
+      text: '只剩下鋼琴陪我談了一天',
+    }])
+    expect(result.measures[2]?.lyrics).toEqual([])
+  })
+
+  test('test_convertTranscriptionToScore_when_lyric_is_outside_score_then_does_not_assign_wrong_measure', () => {
+    // Arrange
+    const input = {
+      ...buildInput([
+        { midi: 60, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
+      ], 2),
+      lyricSegments: [{
+        startSeconds: 10,
+        endSeconds: 11,
+        text: '不屬於這份錄音',
+      }],
+    }
+
+    // Act
+    const result = convertTranscriptionToScore(input)
+
+    // Assert
+    expect(result.measures.flatMap(measure => measure.lyrics)).toEqual([])
+  })
+
+  test('test_convertTranscriptionToScore_when_downbeats_drift_then_uses_detected_measure_boundary_for_lyric', () => {
+    // Arrange
+    const input = {
+      ...buildInput([
+        { midi: 60, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
+      ], 4),
+      downbeatSeconds: [0, 1.8, 3.6],
+      lyricSegments: [{
+        startSeconds: 1.95,
+        endSeconds: 2.8,
+        text: '落在第二小節',
+      }],
+    }
+
+    // Act
+    const result = convertTranscriptionToScore(input)
+
+    // Assert
+    expect(result.measures[0]?.lyrics).toEqual([])
+    expect(result.measures[1]?.lyrics).toEqual([{
+      startBeat: 1.5,
+      text: '落在第二小節',
+    }])
   })
 })
 

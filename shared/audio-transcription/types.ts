@@ -10,11 +10,19 @@ export type TranscribedPedalEvent = {
   value: number
 }
 
+export type TranscribedLyricSegment = {
+  startSeconds: number
+  endSeconds: number
+  text: string
+}
+
 export type TranscriptionInput = {
   notes: TranscribedNote[]
   pedalEvents?: TranscribedPedalEvent[]
+  lyricSegments?: TranscribedLyricSegment[]
   bpm: number
   durationSeconds: number
   firstDownbeatSeconds?: number
+  downbeatSeconds?: number[]
   measureCount?: number
 }

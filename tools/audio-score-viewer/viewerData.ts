@@ -8,6 +8,8 @@ const ScoreEventSchema = z.object({
   fingers: z.array(z.number().int().min(1).max(5)),
   tieToNext: z.boolean(),
   tieFromPrevious: z.boolean().optional(),
+  tieToNextPitches: z.array(z.string().regex(/^[A-G](?:#|b)?\d$/)).optional(),
+  tieFromPreviousPitches: z.array(z.string().regex(/^[A-G](?:#|b)?\d$/)).optional(),
   chordSymbol: z.string().optional(),
 })
 
@@ -56,6 +58,12 @@ const ViewerScoreDataSchema = z.object({
     measures: z.array(ScoreMeasureSchema).min(1),
     keySignature: ScoreKeySignatureSchema.optional(),
     pedalIntervals: z.array(ScorePedalIntervalSchema).optional(),
+    playbackNotes: z.array(z.object({
+      pitch: z.string().regex(/^[A-G](?:#|b)?\d$/),
+      startBeatOffset: z.number().nonnegative(),
+      durationBeats: z.number().positive(),
+      velocity: z.number().int().min(0).max(127),
+    })).optional(),
   }),
 })
 

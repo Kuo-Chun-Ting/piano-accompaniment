@@ -124,6 +124,70 @@ test('test_buildPlaybackSchedule_when_note_releases_under_pedal_then_sustains_un
   })
 })
 
+test('test_buildPlaybackSchedule_when_only_one_chord_pitch_is_tied_then_does_not_reattack_tied_pitch', () => {
+  // Arrange
+  const version = buildScoreVersion([
+    buildMeasure([
+      {
+        ...buildEvent(1, 1, ['C6']),
+        tieToNextPitches: ['C6'],
+      },
+      {
+        ...buildEvent(2, 1, ['E5', 'B5', 'C6']),
+        tieFromPreviousPitches: ['C6'],
+        tieToNextPitches: ['C6'],
+      },
+      {
+        ...buildEvent(3, 1, ['C6']),
+        tieFromPreviousPitches: ['C6'],
+      },
+      buildEvent(4, 1, []),
+    ], []),
+  ])
+
+  // Act
+  const schedule = buildPlaybackSchedule(version, 60)
+
+  // Assert
+  expect(schedule.events.filter(event => event.pitches.length > 0)).toEqual([
+    expect.objectContaining({ startSeconds: 0, durationSeconds: 3, pitches: ['C6'] }),
+    expect.objectContaining({ startSeconds: 1, durationSeconds: 1, pitches: ['E5'] }),
+    expect.objectContaining({ startSeconds: 1, durationSeconds: 1, pitches: ['B5'] }),
+  ])
+})
+
+test('test_buildPlaybackSchedule_when_precise_playback_notes_exist_then_uses_them_instead_of_notation', () => {
+  // Arrange
+  const version: ScoreVersion = {
+    ...buildScoreVersion([
+      buildMeasure([buildEvent(1, 4, ['G6'])], []),
+    ]),
+    playbackNotes: [{
+      pitch: 'C4',
+      startBeatOffset: 0.25,
+      durationBeats: 0.85,
+      velocity: 83,
+    }],
+  }
+
+  // Act
+  const schedule = buildPlaybackSchedule(version, 60)
+
+  // Assert
+  expect(schedule.events.filter(event => event.pitches.length > 0)).toEqual([{
+    id: 'playback-note-0',
+    measureIndex: 0,
+    hand: 'right',
+    eventIndex: 0,
+    startBeat: 1.25,
+    durationBeats: 0.85,
+    startSeconds: 0.25,
+    durationSeconds: 0.85,
+    pitches: ['C4'],
+    velocity: 83,
+  }])
+})
+
 test('test_buildPlaybackPosition_when_playing_inside_measure_then_returns_measure_and_active_events', () => {
   // Arrange
   const schedule = buildPlaybackSchedule(buildScoreVersion([

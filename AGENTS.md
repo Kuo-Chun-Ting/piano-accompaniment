@@ -29,3 +29,4 @@
 
 1. 預設執行所有不會呼叫真實 API 的測試。
 2. 只有修改 prompt、AI schema、model 選擇或真實 API 串接時，才執行會呼叫真實 AI API 的 `@live` E2E test。
+3. 修改音訊轉譜、五線譜渲染或 Player 後，執行 `npm run audio:score:verify`；安靜與楓都通過才算完成。

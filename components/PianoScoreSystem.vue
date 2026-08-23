@@ -16,6 +16,7 @@ import type {
   ScoreEvent,
   ScoreKeySignature,
   ScoreLyricCue,
+  ScorePedalInterval,
 } from '~/shared/arrangement/types'
 import {
   getScoreCueX,
@@ -26,6 +27,7 @@ import type { ScoreSystem } from '~/shared/ui/scoreSystems'
 const props = defineProps<{
   system: ScoreSystem
   keySignature?: ScoreKeySignature
+  pedalIntervals?: ScorePedalInterval[]
 }>()
 
 const container = ref<HTMLDivElement | null>(null)
@@ -88,6 +90,7 @@ function renderSystem(): void {
 
   drawVoiceTies(context, staves.map(stave => stave.trebleVoice))
   drawVoiceTies(context, staves.map(stave => stave.bassVoice))
+  drawPedalMarkings(context, staves.map(stave => stave.bass))
 
   const first = staves[0]
   const last = staves.at(-1)
@@ -213,24 +216,40 @@ function drawVoiceTies(
 
     const previous = renderedEvents[index - 1]
     const next = renderedEvents[index + 1]
-    const indexes = event.pitches.map((_, pitchIndex) => pitchIndex)
-    const hasConnectedPrevious = event.tieFromPrevious
-      && previous?.event.tieToNext
-      && samePitches(previous.event.pitches, event.pitches)
+    const tiedFromPrevious = getTiedFromPreviousPitches(event)
+    const tiedToNext = getTiedToNextPitches(event)
+    const connectedFromPrevious = previous
+      ? tiedFromPrevious.filter(pitch => getTiedToNextPitches(previous.event).includes(pitch))
+      : []
 
-    if (event.tieFromPrevious && !hasConnectedPrevious) {
-      drawTie(context, undefined, note, indexes)
+    if (tiedFromPrevious.length > connectedFromPrevious.length) {
+      const openPitches = tiedFromPrevious.filter(pitch => !connectedFromPrevious.includes(pitch))
+      const indexes = getPitchIndexes(event, openPitches)
+      drawTie(context, undefined, note, indexes, indexes)
     }
 
-    if (!event.tieToNext) {
+    if (tiedToNext.length === 0) {
       return
     }
 
-    const connectedNext = next?.event.tieFromPrevious
-      && samePitches(event.pitches, next.event.pitches)
-      ? next.note
-      : undefined
-    drawTie(context, note, connectedNext, indexes)
+    const connectedPitches = next
+      ? tiedToNext.filter(pitch => getTiedFromPreviousPitches(next.event).includes(pitch))
+      : []
+    if (connectedPitches.length > 0 && next) {
+      drawTie(
+        context,
+        note,
+        next.note,
+        getPitchIndexes(event, connectedPitches),
+        getPitchIndexes(next.event, connectedPitches),
+      )
+    }
+
+    const openPitches = tiedToNext.filter(pitch => !connectedPitches.includes(pitch))
+    if (openPitches.length > 0) {
+      const indexes = getPitchIndexes(event, openPitches)
+      drawTie(context, note, undefined, indexes, indexes)
+    }
   })
 }
 
@@ -238,18 +257,59 @@ function drawTie(
   context: ReturnType<Renderer['getContext']>,
   firstNote: StaveNote | undefined,
   lastNote: StaveNote | undefined,
-  indexes: number[],
+  firstIndexes: number[],
+  lastIndexes: number[],
 ): void {
   new StaveTie({
     firstNote,
     lastNote,
-    firstIndexes: indexes,
-    lastIndexes: indexes,
+    firstIndexes,
+    lastIndexes,
   }).setContext(context).draw()
 }
 
-function samePitches(left: string[], right: string[]): boolean {
-  return left.length === right.length && left.every((pitch, index) => pitch === right[index])
+function getTiedFromPreviousPitches(event: ScoreEvent): string[] {
+  return event.tieFromPreviousPitches ?? (event.tieFromPrevious ? event.pitches : [])
+}
+
+function getTiedToNextPitches(event: ScoreEvent): string[] {
+  return event.tieToNextPitches ?? (event.tieToNext ? event.pitches : [])
+}
+
+function getPitchIndexes(event: ScoreEvent, pitches: string[]): number[] {
+  return pitches.map(pitch => event.pitches.indexOf(pitch)).filter(index => index >= 0)
+}
+
+function drawPedalMarkings(
+  context: ReturnType<Renderer['getContext']>,
+  bassStaves: Stave[],
+): void {
+  const systemStartBeat = props.system.startMeasureIndex * 4
+  const systemEndBeat = systemStartBeat + props.system.measures.length * 4
+
+  for (const interval of props.pedalIntervals ?? []) {
+    if (interval.endBeatOffset <= systemStartBeat || interval.startBeatOffset >= systemEndBeat) {
+      continue
+    }
+
+    const startX = getPedalX(Math.max(interval.startBeatOffset, systemStartBeat), bassStaves)
+    const endX = getPedalX(Math.min(interval.endBeatOffset, systemEndBeat), bassStaves)
+    context.openGroup('pedal-marking')
+    context.setFont('Iowan Old Style, "Times New Roman", serif', 13, 400)
+    context.fillText('Ped.', startX, 272)
+    context.fillText('✱', endX - 8, 272)
+    context.closeGroup()
+  }
+}
+
+function getPedalX(absoluteBeatOffset: number, bassStaves: Stave[]): number {
+  const relativeBeat = absoluteBeatOffset - props.system.startMeasureIndex * 4
+  const measureIndex = Math.min(Math.floor(relativeBeat / 4), bassStaves.length - 1)
+  const beatInMeasure = measureIndex === bassStaves.length - 1 && relativeBeat === bassStaves.length * 4
+    ? 5
+    : relativeBeat - measureIndex * 4 + 1
+  const stave = bassStaves[measureIndex]!
+  return getScoreCueX(beatInMeasure, stave.getNoteStartX(), stave.getX() + stave.getWidth() - 12)
 }
 
 function buildStaveNote(event: ScoreEvent, clef: 'treble' | 'bass'): StaveNote {

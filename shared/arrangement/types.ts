@@ -13,6 +13,8 @@ export type ScoreEvent = {
   fingers: number[]
   tieToNext: boolean
   tieFromPrevious?: boolean
+  tieToNextPitches?: string[]
+  tieFromPreviousPitches?: string[]
   chordSymbol?: string
 }
 
@@ -37,11 +39,19 @@ export type ScorePedalInterval = {
   endBeatOffset: number
 }
 
+export type ScorePlaybackNote = {
+  pitch: string
+  startBeatOffset: number
+  durationBeats: number
+  velocity: number
+}
+
 export type ScoreVersion = {
   level: ArrangementLevelName
   measures: ScoreMeasure[]
   keySignature?: ScoreKeySignature
   pedalIntervals?: ScorePedalInterval[]
+  playbackNotes?: ScorePlaybackNote[]
 }
 
 export type ArrangementSet = {

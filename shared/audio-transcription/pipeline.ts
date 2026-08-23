@@ -7,12 +7,14 @@ export type AudioScorePaths = {
   normalizedAudio: string
   stemsDirectory: string
   pianoStem: string
+  vocalsStem: string
   midi: string
   structureDirectory: string
   structure: string
   demixDirectory: string
   spectrogramDirectory: string
   notes: string
+  lyrics: string
   pianoAudio: string
   score: string
   report: string
@@ -50,12 +52,14 @@ export function resolveAudioScorePaths(outputDirectory: string): AudioScorePaths
     normalizedAudio: join(normalizedInputDirectory, 'normalized.wav'),
     stemsDirectory,
     pianoStem: join(stemsDirectory, 'normalized_piano.wav'),
+    vocalsStem: join(stemsDirectory, 'normalized_vocals.wav'),
     midi: join(outputDirectory, 'piano.mid'),
     structureDirectory,
     structure: join(structureDirectory, 'normalized.json'),
     demixDirectory: join(workDirectory, 'allinone-demix'),
     spectrogramDirectory: join(workDirectory, 'allinone-spec'),
     notes: join(workDirectory, 'notes.json'),
+    lyrics: join(workDirectory, 'lyrics.json'),
     pianoAudio: join(outputDirectory, 'piano.wav'),
     score: join(outputDirectory, 'score.json'),
     report: join(outputDirectory, 'report.json'),
@@ -145,6 +149,26 @@ export function buildAudioScorePipeline(config: AudioScorePipelineConfig): Pipel
         '--output',
         paths.notes,
       ],
+    },
+    {
+      stage: 'transcribe-lyrics',
+      executable: config.pythonExecutable,
+      args: [
+        join(config.projectDirectory, 'scripts/audio-score/transcribe-lyrics.py'),
+        '--input',
+        paths.vocalsStem,
+        '--output',
+        paths.lyrics,
+        '--model',
+        'turbo',
+        '--model-cache',
+        join(config.modelsDirectory, 'whisper'),
+      ],
+      environment: {
+        SSL_CERT_FILE: config.caFile,
+        HF_HOME: join(config.modelsDirectory, 'huggingface'),
+        HF_HUB_CACHE: join(config.modelsDirectory, 'huggingface', 'hub'),
+      },
     },
   ]
 }

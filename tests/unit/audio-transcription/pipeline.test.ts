@@ -20,12 +20,14 @@ describe('audioScorePipeline', () => {
       normalizedAudio: '/tmp/My Score Output/work/input/normalized.wav',
       stemsDirectory: '/tmp/My Score Output/work/stems',
       pianoStem: '/tmp/My Score Output/work/stems/normalized_piano.wav',
+      vocalsStem: '/tmp/My Score Output/work/stems/normalized_vocals.wav',
       midi: '/tmp/My Score Output/piano.mid',
       structureDirectory: '/tmp/My Score Output/work/structure',
       structure: '/tmp/My Score Output/work/structure/normalized.json',
       demixDirectory: '/tmp/My Score Output/work/allinone-demix',
       spectrogramDirectory: '/tmp/My Score Output/work/allinone-spec',
       notes: '/tmp/My Score Output/work/notes.json',
+      lyrics: '/tmp/My Score Output/work/lyrics.json',
       pianoAudio: '/tmp/My Score Output/piano.wav',
       score: '/tmp/My Score Output/score.json',
       report: '/tmp/My Score Output/report.json',
@@ -55,6 +57,7 @@ describe('audioScorePipeline', () => {
       'transcribe-midi',
       'analyze-structure',
       'export-midi-notes',
+      'transcribe-lyrics',
     ])
     expect(commands[0]).toMatchObject({
       executable: 'ffmpeg',
@@ -87,6 +90,20 @@ describe('audioScorePipeline', () => {
         '/tmp/My Score Output/piano.mid',
         '--output',
         '/tmp/My Score Output/work/notes.json',
+      ],
+    })
+    expect(commands[5]).toMatchObject({
+      executable: '/tmp/audio venv/bin/python',
+      args: [
+        '/project root/scripts/audio-score/transcribe-lyrics.py',
+        '--input',
+        '/tmp/My Score Output/work/stems/normalized_vocals.wav',
+        '--output',
+        '/tmp/My Score Output/work/lyrics.json',
+        '--model',
+        'turbo',
+        '--model-cache',
+        '/tmp/model weights/whisper',
       ],
     })
   })

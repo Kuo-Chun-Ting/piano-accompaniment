@@ -12,7 +12,8 @@
     "test:e2e:live": "PLAYWRIGHT_LIVE=true playwright test --grep @live",
     "typecheck": "nuxt typecheck",
     "audio:score:viewer": "vite build --config tools/audio-score-viewer/vite.config.ts",
-    "audio:score": "tsx scripts/audio-score.ts"
+    "audio:score": "tsx scripts/audio-score.ts",
+    "audio:score:verify": "tsx scripts/audio-score-verify.ts && vitest run tests/component/AudioScoreGeneratedOutput.test.ts tests/component/PianoScoreSystem.test.ts"
   },
   "dependencies": {
     "nuxt": "^3.21.8",

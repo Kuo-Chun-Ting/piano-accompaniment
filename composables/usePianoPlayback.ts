@@ -8,6 +8,7 @@ import {
   type PlaybackSchedule,
 } from '~/shared/audio/playbackSchedule'
 import { normalizeSamplePitch, PIANO_SAMPLE_URLS } from '~/shared/audio/pianoSamples'
+import { getPlaybackGain } from '~/shared/audio/playbackVelocity'
 
 type PlaybackStatus = 'idle' | 'loading' | 'paused' | 'playing'
 
@@ -256,6 +257,7 @@ export function usePianoPlayback() {
         pitch,
         playbackStartedAt + relativeStart,
         remainingDuration,
+        event.velocity,
       )
     })
   }
@@ -266,6 +268,7 @@ export function usePianoPlayback() {
     pitch: string,
     startSeconds: number,
     durationSeconds: number,
+    velocity: number | undefined,
   ): void {
     const buffer = buffers.get(normalizeSamplePitch(pitch))
 
@@ -278,8 +281,9 @@ export function usePianoPlayback() {
     const releaseStart = startSeconds + Math.max(0, durationSeconds - RELEASE_SECONDS)
 
     source.buffer = buffer
-    gain.gain.setValueAtTime(0.7, startSeconds)
-    gain.gain.setValueAtTime(0.7, releaseStart)
+    const playbackGain = getPlaybackGain(velocity)
+    gain.gain.setValueAtTime(playbackGain, startSeconds)
+    gain.gain.setValueAtTime(playbackGain, releaseStart)
     gain.gain.linearRampToValueAtTime(0, startSeconds + durationSeconds)
     source.connect(gain).connect(audioContext.destination)
     source.addEventListener('ended', () => activeSources.delete(source), { once: true })

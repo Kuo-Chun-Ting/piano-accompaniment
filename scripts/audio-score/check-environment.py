@@ -10,6 +10,7 @@ PACKAGES = (
     "all-in-one-infer",
     "bs-roformer-infer",
     "certifi",
+    "faster-whisper",
     "mido",
     "setuptools",
     "soundfile",

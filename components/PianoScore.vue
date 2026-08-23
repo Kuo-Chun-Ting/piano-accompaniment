@@ -127,6 +127,7 @@ function isVisible(element: HTMLElement): boolean {
       <PianoScoreSystem
         :system="system"
         :key-signature="props.version.keySignature"
+        :pedal-intervals="props.version.pedalIntervals"
       />
     </article>
   </div>
