@@ -32,13 +32,12 @@ for (const name of ['安靜', '楓']) {
     const score = JSON.parse(readFileSync(scorePath, 'utf8'))
     const systems = buildScoreSystems(score.version.measures)
 
-    for (const measure of score.version.measures) {
-      for (const staff of measure.staves) {
-        expect(staff.voices).toHaveLength(1)
-      }
-    }
-
     for (const system of systems) {
+      const visibleEventCount = system.measures.flatMap(measure => measure.staves)
+        .flatMap(staff => staff.voices)
+        .flatMap(voice => voice.events)
+        .filter(event => !event.isSpacer)
+        .length
       const wrapper = mount(PianoScoreSystem, {
         props: {
           system,
@@ -48,6 +47,7 @@ for (const name of ['安靜', '楓']) {
       })
       await nextTick()
       expect(wrapper.findAll('svg .vf-stave')).toHaveLength(system.measures.length * 2)
+      expect(wrapper.findAll('svg .vf-stavenote')).toHaveLength(visibleEventCount)
       wrapper.unmount()
     }
   })

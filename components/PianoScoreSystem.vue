@@ -2,8 +2,10 @@
 import {
   Accidental,
   Beam,
+  Dot,
   Formatter,
   FretHandFinger,
+  GhostNote,
   Modifier,
   Renderer,
   Stave,
@@ -24,6 +26,7 @@ import {
   SCORE_SYSTEM_LAYOUT,
 } from '~/shared/ui/scoreLayout'
 import type { ScoreSystem } from '~/shared/ui/scoreSystems'
+import { fitTextWithinBounds, getScoreSystemMeasureWidths } from '~/shared/ui/scoreSystems'
 
 const props = defineProps<{
   system: ScoreSystem
@@ -38,7 +41,7 @@ let layoutFrame: number | null = null
 type RenderedVoice = {
   id: string
   events: ScoreEvent[]
-  notes: StaveNote[]
+  notes: Array<StaveNote | undefined>
   voice: Voice
   beams: Beam[]
 }
@@ -72,16 +75,23 @@ function renderSystem(): void {
   renderer.resize(width, SCORE_SYSTEM_LAYOUT.height)
   const context = renderer.getContext()
   const outerPadding = 16
-  const measureWidth = (width - outerPadding * 2) / props.system.measures.length
+  const measureWidths = getScoreSystemMeasureWidths(props.system, width - outerPadding * 2)
+  let nextMeasureX = outerPadding
   context.openGroup('score-notation')
   const staves = props.system.measures.map((measure, measureIndex) => {
-    const x = outerPadding + measureIndex * measureWidth
+    const x = nextMeasureX
+    const measureWidth = measureWidths[measureIndex]!
+    nextMeasureX += measureWidth
     const treble = new Stave(x, SCORE_SYSTEM_LAYOUT.trebleStaveY, measureWidth)
     const bass = new Stave(x, SCORE_SYSTEM_LAYOUT.bassStaveY, measureWidth)
 
     if (measureIndex === 0) {
-      treble.addClef('treble').addKeySignature(props.keySignature ?? 'C').addTimeSignature('4/4')
-      bass.addClef('bass').addKeySignature(props.keySignature ?? 'C').addTimeSignature('4/4')
+      treble.addClef('treble').addKeySignature(props.keySignature ?? 'C')
+      bass.addClef('bass').addKeySignature(props.keySignature ?? 'C')
+      if (props.system.startMeasureIndex === 0) {
+        treble.addTimeSignature('4/4')
+        bass.addTimeSignature('4/4')
+      }
     }
 
     treble.setContext(context).draw()
@@ -166,9 +176,11 @@ function drawLyrics(
   context.openGroup('score-lyrics')
   context.setFont('Iowan Old Style, "Noto Serif TC", serif', 13, 400)
   lyrics.forEach((lyric) => {
+    const preferredX = getScoreCueX(lyric.startBeat, noteStartX, noteEndX)
+    const textWidth = context.measureText(lyric.text).width
     context.fillText(
       lyric.text,
-      getScoreCueX(lyric.startBeat, noteStartX, noteEndX),
+      fitTextWithinBounds(preferredX, textWidth, staveX + 12, noteEndX),
       baselineY,
     )
   })
@@ -254,9 +266,12 @@ function buildRenderedVoice(
   voiceCount: number,
   voiceIndex: number,
 ): RenderedVoice {
-  const notes = events.map(event => buildStaveNote(event, clef, voiceCount, voiceIndex))
-  const voice = new Voice({ numBeats: 4, beatValue: 4 }).addTickables(notes)
-  const beams = Beam.generateBeams(notes)
+  const tickables = events.map(event => event.isSpacer
+    ? new GhostNote({ duration: toVexDuration(event.durationBeats) })
+    : buildStaveNote(event, clef, voiceCount, voiceIndex))
+  const notes = tickables.map(tickable => tickable instanceof StaveNote ? tickable : undefined)
+  const voice = new Voice({ numBeats: 4, beatValue: 4 }).addTickables(tickables)
+  const beams = Beam.generateBeams(tickables)
   return { id, events, notes, voice, beams }
 }
 
@@ -282,12 +297,15 @@ function drawStaffTies(
     }))))
 
   for (const current of renderedEvents) {
+    if (!current.note) {
+      continue
+    }
     current.event.notes.forEach((scoreNote, noteIndex) => {
       if (scoreNote.tieFromPrevious) {
         const previous = renderedEvents.find(candidate =>
           candidate.endBeatOffset === current.startBeatOffset
           && candidate.event.notes.some(note => note.pitch === scoreNote.pitch && note.tieToNext))
-        if (!previous) {
+        if (!previous?.note) {
           drawTie(context, undefined, current.note, [noteIndex], [noteIndex])
         }
       }
@@ -298,7 +316,7 @@ function drawStaffTies(
       const next = renderedEvents.find(candidate =>
         candidate.startBeatOffset === current.endBeatOffset
         && candidate.event.notes.some(note => note.pitch === scoreNote.pitch && note.tieFromPrevious))
-      if (!next) {
+      if (!next?.note) {
         drawTie(context, current.note, undefined, [noteIndex], [noteIndex])
         return
       }
@@ -337,8 +355,16 @@ function drawPedalMarkings(
       continue
     }
 
-    const startX = getPedalX(Math.max(interval.startBeatOffset, systemStartBeat), bassStaves)
-    const endX = getPedalX(Math.min(interval.endBeatOffset, systemEndBeat), bassStaves)
+    const visibleStartBeat = Math.max(interval.startBeatOffset, systemStartBeat)
+    const visibleEndBeat = Math.min(interval.endBeatOffset, systemEndBeat)
+    const isClippedAtSystemBoundary = visibleStartBeat !== interval.startBeatOffset
+      || visibleEndBeat !== interval.endBeatOffset
+    if (isClippedAtSystemBoundary && visibleEndBeat - visibleStartBeat < 0.5) {
+      continue
+    }
+
+    const startX = getPedalX(visibleStartBeat, bassStaves)
+    const endX = getPedalX(visibleEndBeat, bassStaves)
     context.openGroup('pedal-marking')
     context.setLineWidth(1.25)
     context.beginPath()
@@ -387,11 +413,15 @@ function buildStaveNote(
 ): StaveNote {
   const isRest = event.notes.length === 0
   const keys = isRest ? [clef === 'treble' ? 'b/4' : 'd/3'] : event.notes.map(note => toVexPitch(note.pitch))
+  const duration = toVexDuration(event.durationBeats)
   const note = new StaveNote({
     clef,
     keys,
-    duration: `${toVexDuration(event.durationBeats)}${isRest ? 'r' : ''}`,
+    duration: `${duration}${isRest ? 'r' : ''}`,
   })
+  if (duration.endsWith('d')) {
+    Dot.buildAndAttach([note], isRest ? undefined : { all: true })
+  }
   if (voiceCount > 1) {
     note.setStemDirection(voiceIndex % 2 === 0 ? 1 : -1)
   }
@@ -422,7 +452,16 @@ function toVexPitch(pitch: string): string {
 }
 
 function toVexDuration(durationBeats: number): string {
-  const duration = { 4: 'w', 2: 'h', 1: 'q', 0.5: '8' }[durationBeats]
+  const duration = {
+    4: 'w',
+    3: 'hd',
+    2: 'h',
+    1.5: 'qd',
+    1: 'q',
+    0.75: '8d',
+    0.5: '8',
+    0.25: '16',
+  }[durationBeats]
   if (!duration) {
     throw new Error(`Unsupported score duration: ${durationBeats}`)
   }

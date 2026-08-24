@@ -120,6 +120,38 @@ test('test_buildPlaybackSchedule_when_tie_continues_in_another_voice_then_keeps_
   ])
 })
 
+test('test_buildPlaybackSchedule_when_earlier_same_pitch_is_in_later_voice_then_resolves_ties_chronologically', () => {
+  // Arrange
+  const version = buildScoreVersion([
+    buildMeasure(
+      [],
+      [],
+      [
+        [buildEvent(1, 2, []), buildEvent(3, 2, ['A4'], true)],
+        [buildEvent(1, 1, ['A4']), buildEvent(2, 3, [])],
+      ],
+    ),
+    buildMeasure(
+      [],
+      [],
+      [
+        [buildEvent(1, 4, [])],
+        [buildEvent(1, 1, ['A4'], false, true), buildEvent(2, 3, [])],
+      ],
+    ),
+  ])
+
+  // Act
+  const notes = buildPlaybackSchedule(version, 60).events
+    .filter(event => event.pitches.includes('A4'))
+
+  // Assert
+  expect(notes).toEqual([
+    expect.objectContaining({ startBeat: 1, durationBeats: 1 }),
+    expect.objectContaining({ startBeat: 3, durationBeats: 3 }),
+  ])
+})
+
 test('test_buildPlaybackSchedule_when_next_note_is_not_tied_from_previous_then_keeps_repeated_attack', () => {
   // Arrange
   const version = buildScoreVersion([

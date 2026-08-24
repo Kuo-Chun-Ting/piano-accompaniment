@@ -106,6 +106,7 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
     bpm: structureFile.bpm,
     durationSeconds: notesFile.durationSeconds,
     firstDownbeatSeconds,
+    beatSeconds: structureFile.beats,
     downbeatSeconds: structureFile.downbeats,
     measureCount: structureFile.downbeats.length || undefined,
   })
@@ -113,7 +114,12 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
     title: options.title,
     tempo: structureFile.bpm,
     version,
-    pianoAudio: 'piano.wav',
+    referenceAudio: {
+      src: 'piano.wav',
+      scoreStartSeconds: firstDownbeatSeconds,
+      sourceBpm: structureFile.bpm,
+      beatSeconds: structureFile.beats,
+    },
   })
   const renderedNoteEvents = version.measures.flatMap(measure => measure.staves.flatMap(staff =>
     staff.voices.flatMap(voice => voice.events)))

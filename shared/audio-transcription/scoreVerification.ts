@@ -1,7 +1,13 @@
 import type { ScoreVersion } from '../arrangement/types'
 import { buildPlaybackSchedule } from '../audio/playbackSchedule'
 import type { TranscribedNote, TranscribedPedalEvent } from './types'
-import { midiNumberToPitch } from './midiToScore'
+import {
+  buildBeatOffsetConverter,
+  canMergeTiedEvents,
+  groupTranscribedNotesByOnset,
+  midiNumberToPitch,
+  SCORE_CELLS_PER_BEAT,
+} from './midiToScore'
 
 const ONSET_MATCH_TOLERANCE_SECONDS = 0.25
 const DURATION_TOLERANCE_SECONDS = 0.25
@@ -11,6 +17,7 @@ export type ScorePlaybackVerificationInput = {
   version: ScoreVersion
   bpm: number
   originSeconds: number
+  beatSeconds?: number[]
   notes: TranscribedNote[]
   pedalEvents: TranscribedPedalEvent[]
 }
@@ -34,6 +41,13 @@ export type ScoreNotationVerificationIssue =
     measureIndex: number
   }
   | { kind: 'invalid-tie', pitch: string, measureIndex: number }
+  | {
+    kind: 'redundant-tie'
+    staffId: 'treble' | 'bass'
+    measureIndex: number
+    startBeat: number
+    durationBeats: number
+  }
   | { kind: 'invalid-pedal-interval' }
   | {
     kind: 'unplayable-staff-span'
@@ -54,6 +68,21 @@ export function verifyScoreNotation(version: ScoreVersion): ScoreNotationVerific
     for (const staff of measure.staves) {
       issues.push(...findUnplayableStaffSpans(staff, measure.index))
       for (const voice of staff.voices) {
+        for (let eventIndex = 0; eventIndex < voice.events.length - 1; eventIndex += 1) {
+          const event = voice.events[eventIndex]!
+          const nextEvent = voice.events[eventIndex + 1]!
+          if (canMergeTiedEvents(event, nextEvent)
+            || isRedundantShortChordTie(event, nextEvent)) {
+            issues.push({
+              kind: 'redundant-tie',
+              staffId: staff.id,
+              measureIndex: measure.index,
+              startBeat: event.startBeat,
+              durationBeats: event.durationBeats + nextEvent.durationBeats,
+            })
+          }
+        }
+
         let expectedStartBeat = 1
         for (const event of voice.events) {
           if (event.startBeat !== expectedStartBeat || event.durationBeats <= 0) {
@@ -108,6 +137,24 @@ export function verifyScoreNotation(version: ScoreVersion): ScoreNotationVerific
   return { issues }
 }
 
+function isRedundantShortChordTie(
+  first: ScoreVersion['measures'][number]['staves'][number]['voices'][number]['events'][number],
+  second: ScoreVersion['measures'][number]['staves'][number]['voices'][number]['events'][number],
+): boolean {
+  const combinedDuration = first.durationBeats + second.durationBeats
+  if (combinedDuration > 2
+    || first.startBeat + first.durationBeats !== second.startBeat
+    || first.notes.length < 2
+    || first.notes.length !== second.notes.length) {
+    return false
+  }
+
+  return first.notes.every((note) => {
+    const continuation = second.notes.find(candidate => candidate.pitch === note.pitch)
+    return note.tieToNext === true && continuation?.tieFromPrevious === true
+  })
+}
+
 function findUnplayableStaffSpans(
   staff: ScoreVersion['measures'][number]['staves'][number],
   measureIndex: number,
@@ -155,7 +202,8 @@ export function verifyScorePlayback(
 
     matchedExpectedIndexes.add(matchIndex)
     const expected = expectedNotes[matchIndex]!
-    if (Math.abs(expected.durationSeconds - actual.durationSeconds) > DURATION_TOLERANCE_SECONDS) {
+    if (expected.compareDuration
+      && Math.abs(expected.durationSeconds - actual.durationSeconds) > DURATION_TOLERANCE_SECONDS) {
       issues.push({
         kind: 'sustain-duration',
         pitch: actual.pitch,
@@ -179,6 +227,7 @@ type ComparableNote = {
   pitch: string
   startSeconds: number
   durationSeconds: number
+  compareDuration: boolean
 }
 
 function buildActualNotes(version: ScoreVersion, bpm: number): ComparableNote[] {
@@ -187,32 +236,58 @@ function buildActualNotes(version: ScoreVersion, bpm: number): ComparableNote[] 
     pitch,
     startSeconds: event.startSeconds,
     durationSeconds: event.durationSeconds,
+    compareDuration: true,
   })))
 }
 
 function buildExpectedNotes(input: ScorePlaybackVerificationInput): ComparableNote[] {
-  const pedalIntervals = buildPedalIntervals(input.pedalEvents)
-  const cellsPerBeat = 2
+  const toBeatOffset = buildBeatOffsetConverter(input.bpm, input.originSeconds, input.beatSeconds)
+  const pedalIntervals = buildPedalIntervals(input.pedalEvents, toBeatOffset)
+  const cellsPerBeat = SCORE_CELLS_PER_BEAT
   const secondsPerBeat = 60 / input.bpm
   const totalCells = input.version.measures.length * 4 * cellsPerBeat
-  const quantizedByAttack = new Map<string, { midi: number, startCell: number, endCell: number }>()
+  const quantizedByAttack = new Map<string, {
+    midi: number
+    startCell: number
+    endCell: number
+    compareDuration: boolean
+  }>()
 
-  for (const note of input.notes) {
-    const startBeatOffset = (note.startSeconds - input.originSeconds) / secondsPerBeat
-    const endBeatOffset = (note.endSeconds - input.originSeconds) / secondsPerBeat
-    if (note.endSeconds <= input.originSeconds || startBeatOffset >= totalCells / cellsPerBeat) {
-      continue
-    }
-    const startCell = clampInteger(Math.round(startBeatOffset * cellsPerBeat), 0, totalCells - 1)
-    const endCell = clampInteger(
-      Math.max(startCell + 1, Math.round(endBeatOffset * cellsPerBeat)),
+  const onsetGroups = groupTranscribedNotesByOnset(input.notes)
+  const onsetStartCells = onsetGroups.map(group => clampInteger(
+    Math.round(toBeatOffset(group[0]!.startSeconds) * cellsPerBeat),
+    0,
+    totalCells - 1,
+  ))
+
+  for (const [groupIndex, onsetGroup] of onsetGroups.entries()) {
+    const groupStartBeatOffset = toBeatOffset(onsetGroup[0]!.startSeconds)
+    const startCell = onsetStartCells[groupIndex]!
+    const nextAttackCell = onsetStartCells.find((candidate, index) =>
+      index > groupIndex && candidate > startCell)
+    const groupEndCells = onsetGroup.map(note => clampInteger(
+      Math.max(startCell + 1, Math.round(toBeatOffset(note.endSeconds) * cellsPerBeat)),
       1,
       totalCells,
-    )
-    const key = `${note.midi}:${startCell}`
-    const existing = quantizedByAttack.get(key)
-    if (!existing || existing.endCell < endCell) {
-      quantizedByAttack.set(key, { midi: note.midi, startCell, endCell })
+    ))
+    const hasStaggeredRelease = new Set(groupEndCells).size > 1
+    const crossesNextAttack = nextAttackCell !== undefined
+      && groupEndCells.some(endCell => endCell > nextAttackCell)
+    const compareDuration = !hasStaggeredRelease
+      && !crossesNextAttack
+      && !isPedaledChord(onsetGroup, pedalIntervals, toBeatOffset)
+
+    for (const [noteIndex, note] of onsetGroup.entries()) {
+      if (note.endSeconds <= input.originSeconds
+        || groupStartBeatOffset >= totalCells / cellsPerBeat) {
+        continue
+      }
+      const endCell = groupEndCells[noteIndex]!
+      const key = `${note.midi}:${startCell}`
+      const existing = quantizedByAttack.get(key)
+      if (!existing || existing.endCell < endCell) {
+        quantizedByAttack.set(key, { midi: note.midi, startCell, endCell, compareDuration })
+      }
     }
   }
 
@@ -233,16 +308,32 @@ function buildExpectedNotes(input: ScorePlaybackVerificationInput): ComparableNo
   return [...quantizedByAttack.values()]
     .filter(note => note.endCell > note.startCell)
     .map((note) => {
-      const startSeconds = note.startCell / cellsPerBeat * secondsPerBeat
-      const endSeconds = input.originSeconds + note.endCell / cellsPerBeat * secondsPerBeat
-      const audibleEndSeconds = findAudibleEndSeconds(endSeconds, pedalIntervals)
+      const startBeatOffset = note.startCell / cellsPerBeat
+      const endBeatOffset = note.endCell / cellsPerBeat
+      const audibleEndBeatOffset = findAudibleEndBeatOffset(endBeatOffset, pedalIntervals)
       return {
         midi: note.midi,
         pitch: midiNumberToPitch(note.midi),
-        startSeconds,
-        durationSeconds: audibleEndSeconds - input.originSeconds - startSeconds,
+        startSeconds: startBeatOffset * secondsPerBeat,
+        durationSeconds: (audibleEndBeatOffset - startBeatOffset) * secondsPerBeat,
+        compareDuration: note.compareDuration,
       }
     })
+}
+
+function isPedaledChord(
+  notes: TranscribedNote[],
+  pedalIntervals: PedalIntervalBeats[],
+  toBeatOffset: (seconds: number) => number,
+): boolean {
+  if (notes.length < 3) {
+    return false
+  }
+
+  const startBeatOffset = toBeatOffset(notes[0]!.startSeconds)
+  const endBeatOffset = Math.max(...notes.map(note => toBeatOffset(note.endSeconds)))
+  return pedalIntervals.some(interval =>
+    interval.startBeatOffset < endBeatOffset && interval.endBeatOffset > startBeatOffset)
 }
 
 function clampInteger(value: number, minimum: number, maximum: number): number {
@@ -271,20 +362,26 @@ function findExpectedMatch(
   return bestIndex
 }
 
-type PedalIntervalSeconds = {
-  startSeconds: number
-  endSeconds: number
+type PedalIntervalBeats = {
+  startBeatOffset: number
+  endBeatOffset: number
 }
 
-function buildPedalIntervals(events: TranscribedPedalEvent[]): PedalIntervalSeconds[] {
-  const intervals: PedalIntervalSeconds[] = []
+function buildPedalIntervals(
+  events: TranscribedPedalEvent[],
+  toBeatOffset: (seconds: number) => number,
+): PedalIntervalBeats[] {
+  const intervals: PedalIntervalBeats[] = []
   let startSeconds: number | null = null
 
   for (const event of [...events].sort((left, right) => left.timeSeconds - right.timeSeconds)) {
     if (event.value >= 64) {
       startSeconds ??= event.timeSeconds
     } else if (startSeconds !== null) {
-      intervals.push({ startSeconds, endSeconds: event.timeSeconds })
+      intervals.push({
+        startBeatOffset: toBeatOffset(startSeconds),
+        endBeatOffset: toBeatOffset(event.timeSeconds),
+      })
       startSeconds = null
     }
   }
@@ -292,10 +389,13 @@ function buildPedalIntervals(events: TranscribedPedalEvent[]): PedalIntervalSeco
   return intervals
 }
 
-function findAudibleEndSeconds(noteEndSeconds: number, intervals: PedalIntervalSeconds[]): number {
+function findAudibleEndBeatOffset(
+  noteEndBeatOffset: number,
+  intervals: PedalIntervalBeats[],
+): number {
   const pedal = intervals.find(interval =>
-    interval.startSeconds <= noteEndSeconds && noteEndSeconds < interval.endSeconds)
-  return pedal?.endSeconds ?? noteEndSeconds
+    interval.startBeatOffset <= noteEndBeatOffset && noteEndBeatOffset < interval.endBeatOffset)
+  return pedal?.endBeatOffset ?? noteEndBeatOffset
 }
 
 function pitchToMidi(pitch: string): number {

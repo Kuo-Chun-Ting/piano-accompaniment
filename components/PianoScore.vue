@@ -17,7 +17,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  playMeasure: [measureIndex: number]
   seekMeasure: [measureIndex: number, progress: number]
 }>()
 
@@ -78,7 +77,7 @@ function handleSystemClick(event: MouseEvent, systemIndex: number): void {
   const bounds = element.getBoundingClientRect()
   const progress = Math.min(Math.max((event.clientX - bounds.left) / bounds.width, 0), 1)
   const seekTarget = getScoreSystemSeekTarget(systems.value[systemIndex], progress)
-  emit('playMeasure', seekTarget.measureIndex)
+  emit('seekMeasure', seekTarget.measureIndex, seekTarget.measureProgress)
 }
 
 function handleSeek(event: Event, systemIndex: number): void {

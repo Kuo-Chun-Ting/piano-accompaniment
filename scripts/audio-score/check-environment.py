@@ -12,6 +12,7 @@ PACKAGES = (
     "certifi",
     "faster-whisper",
     "mido",
+    "opencc-python-reimplemented",
     "setuptools",
     "soundfile",
     "torch",

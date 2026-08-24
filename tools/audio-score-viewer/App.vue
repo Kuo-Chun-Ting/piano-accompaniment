@@ -28,7 +28,7 @@ const chart: ConfirmedChart = {
       :arrangements="arrangements"
       :chart="chart"
       :show-version-switcher="false"
-      :reference-audio-src="data.pianoAudio"
+      :reference-audio="data.referenceAudio"
     />
   </main>
 </template>

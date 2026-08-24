@@ -16,8 +16,12 @@ import type {
 import { inferKeySignature, type PitchSpelling } from './keySignature'
 
 const BEATS_PER_MEASURE = 4
-const CELLS_PER_BEAT = 2
+export const SCORE_CELLS_PER_BEAT = 4
+const LYRIC_CELLS_PER_BEAT = 2
+const CELLS_PER_BEAT = SCORE_CELLS_PER_BEAT
 const CELLS_PER_MEASURE = BEATS_PER_MEASURE * CELLS_PER_BEAT
+const MAXIMUM_CHORD_ONSET_SPREAD_SECONDS = 0.1
+const READABLE_SHORT_CHORD_DURATION_CELLS = [1, 2, 3, 4, 6, 8] as const
 const PREFERRED_HAND_SPAN_SEMITONES = 12
 const MIDDLE_C_MIDI = 60
 const SHARP_NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const
@@ -27,6 +31,8 @@ type QuantizedNote = {
   midi: number
   startCell: number
   endCell: number
+  endSeconds: number
+  onsetGroupId: number
 }
 
 type AssignedNote = QuantizedNote & {
@@ -46,24 +52,25 @@ export function convertTranscriptionToScore(input: TranscriptionInput): ScoreVer
   validateInput(input)
 
   const originSeconds = input.firstDownbeatSeconds ?? 0
-  const availableSeconds = Math.max(input.durationSeconds - originSeconds, 0)
-  const availableBeats = availableSeconds * input.bpm / 60
+  const toBeatOffset = buildBeatOffsetConverter(input.bpm, originSeconds, input.beatSeconds)
+  const availableBeats = Math.max(toBeatOffset(input.durationSeconds), 0)
   const inferredMeasureCount = Math.max(1, Math.ceil(availableBeats / BEATS_PER_MEASURE))
   const measureCount = Math.max(
     input.measureCount ?? inferredMeasureCount,
-    getRequiredMeasureCount(input.notes, input.bpm, originSeconds),
+    getRequiredMeasureCount(input.notes, toBeatOffset),
   )
   const totalCells = measureCount * CELLS_PER_MEASURE
-  const onsetGroups = groupNotesByOnset(input.notes, input.bpm, originSeconds, totalCells)
-  const quantizedNotes = truncateNotesAtRepeatedAttack([...onsetGroups.values()].flat())
-  const assignedNotes = assignNotesToStaves(quantizedNotes)
+  const onsetGroups = groupNotesByOnset(input.notes, toBeatOffset, totalCells)
   const keySignature = inferKeySignature(input.notes)
   const pedalIntervals = buildPedalIntervals(
     input.pedalEvents ?? [],
-    input.bpm,
-    originSeconds,
+    toBeatOffset,
     measureCount * BEATS_PER_MEASURE,
   )
+  const quantizedNotes = [...onsetGroups.values()].flat()
+  const staffNotes = assignNotesToStaves(quantizedNotes)
+  const normalizedNotes = normalizeChordDurations(staffNotes)
+  const assignedNotes = truncateNotesAtRepeatedAttack(normalizedNotes)
   const lyricsByMeasure = buildLyricsByMeasure(
     input.lyricSegments ?? [],
     input.bpm,
@@ -147,7 +154,7 @@ function locateLyricPosition(
     ? (startSeconds - measureStartSeconds) * bpm / 60
     : (startSeconds - measureStartSeconds) / (nextMeasureSeconds - measureStartSeconds)
       * BEATS_PER_MEASURE
-  const quantizedBeatOffset = Math.round(beatOffset * CELLS_PER_BEAT) / CELLS_PER_BEAT
+  const quantizedBeatOffset = Math.round(beatOffset * LYRIC_CELLS_PER_BEAT) / LYRIC_CELLS_PER_BEAT
   const measureIndex = detectedMeasureIndex
     + Math.floor(quantizedBeatOffset / BEATS_PER_MEASURE)
   if (measureIndex >= measureCount) {
@@ -181,13 +188,12 @@ export function midiNumberToPitch(midi: number, spelling: PitchSpelling = 'sharp
 
 function getRequiredMeasureCount(
   notes: TranscribedNote[],
-  bpm: number,
-  originSeconds: number,
+  toBeatOffset: (seconds: number) => number,
 ): number {
   const latestEndSeconds = notes
     .filter(isValidNote)
-    .reduce((latest, note) => Math.max(latest, note.endSeconds), originSeconds)
-  const contentBeats = Math.max(latestEndSeconds - originSeconds, 0) * bpm / 60
+    .reduce((latest, note) => Math.max(latest, note.endSeconds), 0)
+  const contentBeats = Math.max(toBeatOffset(latestEndSeconds), 0)
   return Math.max(1, Math.ceil(contentBeats / BEATS_PER_MEASURE))
 }
 
@@ -211,8 +217,7 @@ function validateInput(input: TranscriptionInput): void {
 
 function buildPedalIntervals(
   events: TranscribedPedalEvent[],
-  bpm: number,
-  originSeconds: number,
+  toBeatOffset: (seconds: number) => number,
   totalBeats: number,
 ): ScorePedalInterval[] {
   const intervals: ScorePedalInterval[] = []
@@ -230,13 +235,17 @@ function buildPedalIntervals(
       continue
     }
 
-    appendPedalInterval(intervals, pedalDownSeconds, event.timeSeconds, bpm, originSeconds, totalBeats)
+    appendPedalInterval(
+      intervals,
+      toBeatOffset(pedalDownSeconds),
+      toBeatOffset(event.timeSeconds),
+      totalBeats,
+    )
     pedalDownSeconds = null
   }
 
   if (pedalDownSeconds !== null) {
-    const scoreEndSeconds = originSeconds + totalBeats * 60 / bpm
-    appendPedalInterval(intervals, pedalDownSeconds, scoreEndSeconds, bpm, originSeconds, totalBeats)
+    appendPedalInterval(intervals, toBeatOffset(pedalDownSeconds), totalBeats, totalBeats)
   }
 
   return intervals
@@ -244,14 +253,12 @@ function buildPedalIntervals(
 
 function appendPedalInterval(
   intervals: ScorePedalInterval[],
-  startSeconds: number,
-  endSeconds: number,
-  bpm: number,
-  originSeconds: number,
+  rawStartBeatOffset: number,
+  rawEndBeatOffset: number,
   totalBeats: number,
 ): void {
-  const startBeatOffset = clamp((startSeconds - originSeconds) * bpm / 60, 0, totalBeats)
-  const endBeatOffset = clamp((endSeconds - originSeconds) * bpm / 60, 0, totalBeats)
+  const startBeatOffset = clamp(rawStartBeatOffset, 0, totalBeats)
+  const endBeatOffset = clamp(rawEndBeatOffset, 0, totalBeats)
   if (endBeatOffset > startBeatOffset) {
     intervals.push({ startBeatOffset, endBeatOffset })
   }
@@ -266,55 +273,126 @@ function isValidPedalEvent(event: TranscribedPedalEvent): boolean {
 
 function groupNotesByOnset(
   notes: TranscribedNote[],
-  bpm: number,
-  originSeconds: number,
+  toBeatOffset: (seconds: number) => number,
   totalCells: number,
 ): OnsetGroups {
   const groups: OnsetGroups = new Map()
+  const onsetGroups = groupTranscribedNotesByOnset(notes)
+  let previousStartCell = -1
 
-  for (const note of notes) {
-    const quantized = quantizeNote(note, bpm, originSeconds, totalCells)
-    if (!quantized) {
-      continue
-    }
+  for (const [onsetGroupId, onsetGroup] of onsetGroups.entries()) {
+    const rawStartCell = Math.round(toBeatOffset(onsetGroup[0]!.startSeconds) * CELLS_PER_BEAT)
+    const startCell = clamp(Math.max(rawStartCell, previousStartCell + 1), 0, totalCells - 1)
+    const group = onsetGroup
+      .map(note => quantizeNote(note, toBeatOffset, totalCells, startCell, onsetGroupId))
+      .filter((note): note is QuantizedNote => note !== null)
 
-    const group = groups.get(quantized.startCell) ?? []
-    const duplicate = group.find(candidate => candidate.midi === quantized.midi)
-    if (duplicate) {
-      duplicate.endCell = Math.max(duplicate.endCell, quantized.endCell)
-    } else {
-      group.push(quantized)
-      groups.set(quantized.startCell, group)
+    if (group.length > 0) {
+      groups.set(onsetGroupId, mergeDuplicatePitches(group))
+      previousStartCell = startCell
     }
   }
 
   return groups
 }
 
+export function groupTranscribedNotesByOnset(notes: TranscribedNote[]): TranscribedNote[][] {
+  const groups: TranscribedNote[][] = []
+  const sortedNotes = notes.filter(isValidNote)
+    .sort((left, right) => left.startSeconds - right.startSeconds)
+
+  for (const note of sortedNotes) {
+    const currentGroup = groups.at(-1)
+    const groupStartSeconds = currentGroup?.[0]?.startSeconds
+    if (currentGroup
+      && groupStartSeconds !== undefined
+      && note.startSeconds - groupStartSeconds <= MAXIMUM_CHORD_ONSET_SPREAD_SECONDS) {
+      currentGroup.push(note)
+    } else {
+      groups.push([note])
+    }
+  }
+  return groups
+}
+
+function mergeDuplicatePitches(notes: QuantizedNote[]): QuantizedNote[] {
+  const result: QuantizedNote[] = []
+  for (const note of notes) {
+    const duplicate = result.find(candidate => candidate.midi === note.midi)
+    if (duplicate) {
+      duplicate.endCell = Math.max(duplicate.endCell, note.endCell)
+      duplicate.endSeconds = Math.max(duplicate.endSeconds, note.endSeconds)
+    } else {
+      result.push(note)
+    }
+  }
+  return result
+}
+
 function quantizeNote(
   note: TranscribedNote,
-  bpm: number,
-  originSeconds: number,
+  toBeatOffset: (seconds: number) => number,
   totalCells: number,
+  startCell: number,
+  onsetGroupId: number,
 ): QuantizedNote | null {
   if (!isValidNote(note)) {
     return null
   }
 
-  const startBeat = (note.startSeconds - originSeconds) * bpm / 60
-  const endBeat = (note.endSeconds - originSeconds) * bpm / 60
+  const startBeat = toBeatOffset(note.startSeconds)
+  const endBeat = toBeatOffset(note.endSeconds)
   if (endBeat <= 0 || startBeat >= totalCells / CELLS_PER_BEAT) {
     return null
   }
 
-  const startCell = clamp(Math.round(startBeat * CELLS_PER_BEAT), 0, totalCells - 1)
   const endCell = clamp(
     Math.max(startCell + 1, Math.round(endBeat * CELLS_PER_BEAT)),
     1,
     totalCells,
   )
 
-  return { midi: note.midi, startCell, endCell }
+  return { midi: note.midi, startCell, endCell, endSeconds: note.endSeconds, onsetGroupId }
+}
+
+export function buildBeatOffsetConverter(
+  bpm: number,
+  originSeconds: number,
+  detectedBeats: number[] | undefined,
+): (seconds: number) => number {
+  const beatSeconds = [
+    originSeconds,
+    ...(detectedBeats ?? [])
+      .filter(time => Number.isFinite(time) && time > originSeconds)
+      .sort((left, right) => left - right),
+  ]
+  if (beatSeconds.length < 2) {
+    return seconds => (seconds - originSeconds) * bpm / 60
+  }
+
+  return seconds => interpolateBeatOffset(seconds, beatSeconds, bpm)
+}
+
+function interpolateBeatOffset(seconds: number, beatSeconds: number[], bpm: number): number {
+  const firstInterval = beatSeconds[1]! - beatSeconds[0]!
+  if (seconds <= beatSeconds[0]!) {
+    return (seconds - beatSeconds[0]!) / firstInterval
+  }
+
+  for (let index = 0; index < beatSeconds.length - 1; index += 1) {
+    const start = beatSeconds[index]!
+    const end = beatSeconds[index + 1]!
+    if (seconds <= end) {
+      return index + (seconds - start) / (end - start)
+    }
+  }
+
+  const lastIndex = beatSeconds.length - 1
+  const lastBeat = beatSeconds[lastIndex]!
+  const previousBeat = beatSeconds[lastIndex - 1]!
+  const fallbackInterval = 60 / bpm
+  const interval = lastBeat > previousBeat ? lastBeat - previousBeat : fallbackInterval
+  return lastIndex + (seconds - lastBeat) / interval
 }
 
 function isValidNote(note: TranscribedNote): boolean {
@@ -366,7 +444,12 @@ function buildMeasureStaff(
     }))
   const voices = [{
     id: `${clef}-1`,
-    events: buildTimelineEvents(measureNotes, measureStart, measureEnd, spelling),
+    events: simplifyTiedEvents(buildTimelineEvents(
+      measureNotes,
+      measureStart,
+      measureEnd,
+      spelling,
+    )),
   }]
 
   return { id: clef, clef, voices }
@@ -446,7 +529,65 @@ function getComponentRegisterCost(
   }, 0)
 }
 
-function truncateNotesAtRepeatedAttack(notes: QuantizedNote[]): QuantizedNote[] {
+function normalizeChordDurations(
+  notes: AssignedNote[],
+): AssignedNote[] {
+  const notesByAttack = new Map<string, AssignedNote[]>()
+  for (const note of notes) {
+    const key = `${note.staffId}:${note.onsetGroupId}`
+    notesByAttack.set(key, [...(notesByAttack.get(key) ?? []), note])
+  }
+
+  const attackCellsByStaff = buildAttackCellsByStaff(notes)
+  for (const attackNotes of notesByAttack.values()) {
+    const staffId = attackNotes[0]!.staffId
+    const startCell = attackNotes[0]!.startCell
+    const nextAttackCell = attackCellsByStaff.get(staffId)
+      ?.find(candidate => candidate > startCell)
+    const commonEndCell = getMedianEndCell(attackNotes, nextAttackCell)
+    const readableEndCell = getReadableChordEndCell(attackNotes, commonEndCell)
+
+    attackNotes.forEach((note) => {
+      note.endCell = readableEndCell
+    })
+  }
+  return notes
+}
+
+function getReadableChordEndCell(notes: AssignedNote[], endCell: number): number {
+  if (notes.length < 2) {
+    return endCell
+  }
+
+  const startCell = notes[0]!.startCell
+  const durationCells = endCell - startCell
+  if (durationCells > READABLE_SHORT_CHORD_DURATION_CELLS.at(-1)!) {
+    return endCell
+  }
+
+  const readableDuration = [...READABLE_SHORT_CHORD_DURATION_CELLS]
+    .reverse()
+    .find(candidate => candidate <= durationCells) ?? 1
+  return startCell + readableDuration
+}
+
+function buildAttackCellsByStaff(notes: AssignedNote[]): Map<ScoreStaff['id'], number[]> {
+  const result = new Map<ScoreStaff['id'], number[]>()
+  for (const staffId of ['treble', 'bass'] as const) {
+    result.set(staffId, [...new Set(notes
+      .filter(note => note.staffId === staffId)
+      .map(note => note.startCell))].sort((left, right) => left - right))
+  }
+  return result
+}
+
+function getMedianEndCell(notes: AssignedNote[], nextAttackCell: number | undefined): number {
+  const endCells = notes.map(note => note.endCell).sort((left, right) => left - right)
+  const medianEndCell = endCells[Math.floor(endCells.length / 2)]!
+  return nextAttackCell === undefined ? medianEndCell : Math.min(medianEndCell, nextAttackCell)
+}
+
+function truncateNotesAtRepeatedAttack<T extends QuantizedNote>(notes: T[]): T[] {
   const byMidi = new Map<number, QuantizedNote[]>()
   for (const note of notes) {
     byMidi.set(note.midi, [...(byMidi.get(note.midi) ?? []), note])
@@ -503,17 +644,56 @@ function buildTimelineEvents(
   return events
 }
 
+export function simplifyTiedEvents(events: ScoreEvent[]): ScoreEvent[] {
+  const simplified: ScoreEvent[] = []
+
+  for (const event of events) {
+    const previous = simplified.at(-1)
+    if (!previous || !canMergeTiedEvents(previous, event)) {
+      simplified.push(event)
+      continue
+    }
+
+    simplified[simplified.length - 1] = mergeTiedEvents(previous, event)
+  }
+
+  return simplified
+}
+
+export function canMergeTiedEvents(first: ScoreEvent, second: ScoreEvent): boolean {
+  const combinedDuration = first.durationBeats + second.durationBeats
+  if (combinedDuration !== 1.5
+    || ![1, 3].includes(first.startBeat)
+    || first.startBeat + first.durationBeats !== second.startBeat
+    || first.notes.length === 0
+    || first.notes.length !== second.notes.length) {
+    return false
+  }
+
+  return first.notes.every((note) => {
+    const continuation = second.notes.find(candidate => candidate.pitch === note.pitch)
+    return note.tieToNext === true && continuation?.tieFromPrevious === true
+  })
+}
+
+function mergeTiedEvents(first: ScoreEvent, second: ScoreEvent): ScoreEvent {
+  return {
+    startBeat: first.startBeat,
+    durationBeats: first.durationBeats + second.durationBeats,
+    notes: first.notes.map((note): ScoreNote => {
+      const continuation = second.notes.find(candidate => candidate.pitch === note.pitch)!
+      return {
+        pitch: note.pitch,
+        ...(note.tieFromPrevious ? { tieFromPrevious: true } : {}),
+        ...(continuation.tieToNext ? { tieToNext: true } : {}),
+      }
+    }),
+  }
+}
+
 function nextSupportedDuration(remainingCells: number): number {
-  if (remainingCells >= 8) {
-    return 8
-  }
-  if (remainingCells >= 4) {
-    return 4
-  }
-  if (remainingCells >= 2) {
-    return 2
-  }
-  return 1
+  const supportedDurations = [16, 12, 8, 6, 4, 3, 2, 1]
+  return supportedDurations.find(duration => duration <= remainingCells) ?? 1
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

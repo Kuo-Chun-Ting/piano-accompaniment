@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { ScoreVersion } from '../../shared/arrangement/types'
+import type { ReferenceAudio } from '../../shared/audio/referenceAudio'
 
 const ScoreNoteSchema = z.object({
   pitch: z.string().regex(/^[A-G](?:#|b)?\d$/),
@@ -9,9 +10,19 @@ const ScoreNoteSchema = z.object({
 })
 
 const ScoreEventSchema = z.object({
-  startBeat: z.number().min(1).max(4.5),
-  durationBeats: z.union([z.literal(0.5), z.literal(1), z.literal(2), z.literal(4)]),
+  startBeat: z.number().min(1).max(4.75),
+  durationBeats: z.union([
+    z.literal(0.25),
+    z.literal(0.5),
+    z.literal(0.75),
+    z.literal(1),
+    z.literal(1.5),
+    z.literal(2),
+    z.literal(3),
+    z.literal(4),
+  ]),
   notes: z.array(ScoreNoteSchema),
+  isSpacer: z.literal(true).optional(),
   chordSymbol: z.string().optional(),
 })
 
@@ -81,6 +92,13 @@ const ScoreKeySignatureSchema = z.enum([
   'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb',
 ])
 
+const ReferenceAudioSchema = z.object({
+  src: z.string().trim().min(1),
+  scoreStartSeconds: z.number().nonnegative(),
+  sourceBpm: z.number().positive(),
+  beatSeconds: z.array(z.number().nonnegative()).min(1),
+})
+
 const ViewerScoreDataSchema = z.object({
   title: z.string().trim().min(1),
   tempo: z.number().int().positive(),
@@ -90,14 +108,14 @@ const ViewerScoreDataSchema = z.object({
     keySignature: ScoreKeySignatureSchema.optional(),
     pedalIntervals: z.array(ScorePedalIntervalSchema).optional(),
   }),
-  pianoAudio: z.string().trim().min(1).optional(),
+  referenceAudio: ReferenceAudioSchema.optional(),
 })
 
 export type ViewerScoreData = {
   title: string
   tempo: number
   version: ScoreVersion
-  pianoAudio?: string
+  referenceAudio?: ReferenceAudio
 }
 
 export function parseViewerData(value: unknown): ViewerScoreData {

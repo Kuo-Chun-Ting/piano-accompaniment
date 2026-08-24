@@ -1,3 +1,4 @@
+import { toValue, type MaybeRefOrGetter } from 'vue'
 import type { ScoreVersion } from '~/shared/arrangement/types'
 import {
   buildPlaybackPosition,
@@ -9,8 +10,15 @@ import {
 } from '~/shared/audio/playbackSchedule'
 import { normalizeSamplePitch, PIANO_SAMPLE_URLS } from '~/shared/audio/pianoSamples'
 import { getPlaybackGain } from '~/shared/audio/playbackVelocity'
+import {
+  getReferenceAudioBeatOffset,
+  getReferenceAudioPlaybackRate,
+  getReferenceAudioSeconds,
+  type ReferenceAudio,
+} from '~/shared/audio/referenceAudio'
 
 type PlaybackStatus = 'idle' | 'loading' | 'paused' | 'playing'
+export type PlaybackMode = 'score' | 'reference'
 
 const PLAYBACK_DELAY_SECONDS = 0.05
 const RELEASE_SECONDS = 0.12
@@ -25,12 +33,16 @@ const EMPTY_POSITION: PlaybackPosition = {
   activeEventIds: [],
 }
 
-export function usePianoPlayback() {
+export function usePianoPlayback(
+  referenceAudio: MaybeRefOrGetter<ReferenceAudio | undefined> = undefined,
+) {
   const status = ref<PlaybackStatus>('idle')
+  const mode = ref<PlaybackMode>('score')
   const errorMessage = ref<string | null>(null)
   const position = ref<PlaybackPosition>({ ...EMPTY_POSITION })
   const activeSources = new Set<AudioBufferSourceNode>()
   let context: AudioContext | null = null
+  let referencePlayer: HTMLAudioElement | null = null
   let sampleBuffers: Map<string, AudioBuffer> | null = null
   let sampleLoading: Promise<Map<string, AudioBuffer>> | null = null
   let schedule: PlaybackSchedule | null = null
@@ -83,6 +95,33 @@ export function usePianoPlayback() {
     schedule = buildPlaybackSchedule(version, bpm)
     playbackOffsetSeconds = nextOffsetSeconds
     position.value = buildPlaybackPosition(schedule, nextOffsetSeconds)
+    updateReferencePlaybackRate(bpm)
+  }
+
+  async function setPlaybackMode(
+    nextMode: PlaybackMode,
+    version: ScoreVersion,
+    bpm: number,
+  ): Promise<void> {
+    if (nextMode === mode.value || (nextMode === 'reference' && !toValue(referenceAudio))) {
+      return
+    }
+
+    if (status.value === 'playing') {
+      updatePosition()
+    }
+
+    const wasPlaying = status.value === 'playing'
+    const startSeconds = position.value.elapsedSeconds
+    clearScheduledPlayback()
+    mode.value = nextMode
+    schedule = buildPlaybackSchedule(version, bpm)
+    playbackOffsetSeconds = startSeconds
+    position.value = buildPlaybackPosition(schedule, startSeconds)
+
+    if (wasPlaying) {
+      await startFrom(version, bpm, startSeconds)
+    }
   }
 
   function pausePlayback(): void {
@@ -100,6 +139,10 @@ export function usePianoPlayback() {
     clearScheduledPlayback()
     status.value = 'idle'
     position.value = schedule ? buildPlaybackPosition(schedule, 0) : { ...EMPTY_POSITION }
+    const audio = toValue(referenceAudio)
+    if (referencePlayer && audio) {
+      referencePlayer.currentTime = audio.scoreStartSeconds
+    }
   }
 
   async function startFrom(version: ScoreVersion, bpm: number, startSeconds: number): Promise<void> {
@@ -109,6 +152,11 @@ export function usePianoPlayback() {
     errorMessage.value = null
 
     try {
+      if (mode.value === 'reference') {
+        await startReferencePlayback(version, bpm, startSeconds)
+        return
+      }
+
       const audioContext = await getAudioContext()
       const buffers = await getSampleBuffers(audioContext)
 
@@ -120,6 +168,39 @@ export function usePianoPlayback() {
     } catch {
       handlePlaybackError(currentRequestId)
     }
+  }
+
+  async function startReferencePlayback(
+    version: ScoreVersion,
+    bpm: number,
+    requestedStartSeconds: number,
+  ): Promise<void> {
+    const audio = toValue(referenceAudio)
+    if (!audio) {
+      throw new Error('Reference piano audio is unavailable.')
+    }
+
+    schedule = buildPlaybackSchedule(version, bpm)
+    playbackOffsetSeconds = Math.min(
+      Math.max(requestedStartSeconds, 0),
+      schedule.totalDurationSeconds,
+    )
+    if (playbackOffsetSeconds >= schedule.totalDurationSeconds) {
+      playbackOffsetSeconds = 0
+    }
+
+    referencePlayer ??= new Audio(audio.src)
+    referencePlayer.preload = 'auto'
+    referencePlayer.preservesPitch = true
+    referencePlayer.playbackRate = getReferenceAudioPlaybackRate(audio.sourceBpm, bpm)
+    referencePlayer.currentTime = getReferenceAudioSeconds(
+      audio,
+      playbackOffsetSeconds / schedule.secondsPerBeat,
+    )
+    position.value = buildPlaybackPosition(schedule, playbackOffsetSeconds)
+    await referencePlayer.play()
+    status.value = 'playing'
+    updateAnimationFrame()
   }
 
   async function getAudioContext(): Promise<AudioContext> {
@@ -179,7 +260,26 @@ export function usePianoPlayback() {
   }
 
   function updatePosition(): void {
-    if (!context || !schedule) {
+    if (!schedule) {
+      return
+    }
+
+    if (mode.value === 'reference') {
+      const audio = toValue(referenceAudio)
+      if (!referencePlayer || !audio) {
+        return
+      }
+
+      const beatOffset = getReferenceAudioBeatOffset(audio, referencePlayer.currentTime)
+      const elapsedSeconds = beatOffset * schedule.secondsPerBeat
+      position.value = buildPlaybackPosition(schedule, elapsedSeconds)
+      if (elapsedSeconds >= schedule.totalDurationSeconds) {
+        finishPlayback()
+      }
+      return
+    }
+
+    if (!context) {
       return
     }
 
@@ -210,6 +310,15 @@ export function usePianoPlayback() {
     clearCompletionTimer()
     cancelPositionUpdates()
     stopActiveSources()
+    referencePlayer?.pause()
+  }
+
+  function updateReferencePlaybackRate(bpm: number): void {
+    const audio = toValue(referenceAudio)
+    if (referencePlayer && audio) {
+      referencePlayer.playbackRate = getReferenceAudioPlaybackRate(audio.sourceBpm, bpm)
+      referencePlayer.preservesPitch = true
+    }
   }
 
   function clearCompletionTimer(): void {
@@ -300,10 +409,12 @@ export function usePianoPlayback() {
   return {
     status,
     errorMessage,
+    mode,
     position,
     togglePlayback,
     seekPlayback,
     changePlaybackTempo,
+    setPlaybackMode,
     stopPlayback,
   }
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ArrangementLevelName, ArrangementSet } from '~/shared/arrangement/types'
+import type { ReferenceAudio } from '~/shared/audio/referenceAudio'
 import { getMeasureSeekSeconds } from '~/shared/audio/playbackSchedule'
 import {
   DEFAULT_PLAYBACK_BPM,
@@ -14,22 +15,25 @@ const props = withDefaults(defineProps<{
   arrangements: ArrangementSet | null
   chart: ConfirmedChart | null
   showVersionSwitcher?: boolean
-  referenceAudioSrc?: string
+  referenceAudio?: ReferenceAudio
 }>(), {
   showVersionSwitcher: true,
 })
 
 const selectedLevel = ref<ArrangementLevelName>('rich')
 const scoreStage = ref<HTMLElement | null>(null)
+const playbackSourceMenu = ref<HTMLDetailsElement | null>(null)
 const {
   status: playbackStatus,
   errorMessage: playbackErrorMessage,
+  mode: playbackMode,
   position: playbackPosition,
   togglePlayback,
   seekPlayback,
   changePlaybackTempo,
+  setPlaybackMode,
   stopPlayback,
-} = usePianoPlayback()
+} = usePianoPlayback(toRef(props, 'referenceAudio'))
 const playbackBpm = ref(DEFAULT_PLAYBACK_BPM)
 
 const currentVersion = computed(() =>
@@ -50,6 +54,9 @@ const playbackLabel = computed(() => ({
   paused: 'Play',
   playing: 'Pause',
 })[playbackStatus.value])
+const playbackSourceLabel = computed(() =>
+  playbackMode.value === 'reference' ? 'Original Piano' : 'Score',
+)
 
 const levelLabels: Record<ArrangementLevelName, string> = {
   easy: 'Simple',
@@ -79,16 +86,6 @@ watch(
 async function handlePlayback(): Promise<void> {
   if (currentVersion.value) {
     await togglePlayback(currentVersion.value, playbackBpm.value)
-  }
-}
-
-async function handlePlayMeasure(measureIndex: number): Promise<void> {
-  if (currentVersion.value) {
-    await seekPlayback(
-      currentVersion.value,
-      playbackBpm.value,
-      getMeasureSeekSeconds(measureIndex, 0, playbackBpm.value),
-    )
   }
 }
 
@@ -123,6 +120,13 @@ async function handleTempoChange(bpm: number): Promise<void> {
   playbackBpm.value = bpm
   if (currentVersion.value) {
     await changePlaybackTempo(currentVersion.value, bpm)
+  }
+}
+
+async function handlePlaybackMode(mode: 'score' | 'reference'): Promise<void> {
+  if (currentVersion.value) {
+    await setPlaybackMode(mode, currentVersion.value, playbackBpm.value)
+    playbackSourceMenu.value?.removeAttribute('open')
   }
 }
 
@@ -165,58 +169,83 @@ function handleExportPdf(): void {
       </header>
 
       <header class="score-controls">
-        <div class="transport">
-          <button
-            class="play"
-            type="button"
-            :disabled="playbackStatus === 'loading'"
-            :aria-label="playbackLabel"
-            :title="playbackLabel"
-            @click="handlePlayback"
-          >
-            {{ playbackStatus === 'playing' ? 'Ⅱ' : '▶' }}
-          </button>
-          <button
-            class="stop"
-            type="button"
-            :disabled="playbackStatus === 'idle' && playbackPosition.elapsedSeconds === 0"
-            aria-label="Stop"
-            title="Stop"
-            @click="stopPlayback"
-          >
-            ■
-          </button>
-        </div>
+        <div class="player-controls">
+          <div class="transport">
+            <button
+              class="play"
+              type="button"
+              :disabled="playbackStatus === 'loading'"
+              :aria-label="playbackLabel"
+              :title="playbackLabel"
+              @click="handlePlayback"
+            >
+              {{ playbackStatus === 'playing' ? 'Ⅱ' : '▶' }}
+            </button>
+            <button
+              class="stop"
+              type="button"
+              :disabled="playbackStatus === 'idle' && playbackPosition.elapsedSeconds === 0"
+              aria-label="Stop"
+              title="Stop"
+              @click="stopPlayback"
+            >
+              ■
+            </button>
+          </div>
 
-        <input
-          class="overall-progress"
-          type="range"
-          min="0"
-          max="1"
-          step="0.001"
-          :value="playbackPosition.progress"
-          aria-label="Score playback progress"
-          @change="handleOverallSeek"
-        >
-        <time>
-          {{ formatElapsedTime(playbackPosition.elapsedSeconds) }}
-          / {{ formatElapsedTime(playbackPosition.totalDurationSeconds || scoreDurationSeconds) }}
-        </time>
+          <input
+            class="overall-progress"
+            type="range"
+            min="0"
+            max="1"
+            step="0.001"
+            :value="playbackPosition.progress"
+            aria-label="Playback progress"
+            @change="handleOverallSeek"
+          >
+          <time>
+            {{ formatElapsedTime(playbackPosition.elapsedSeconds) }}
+            / {{ formatElapsedTime(playbackPosition.totalDurationSeconds || scoreDurationSeconds) }}
+          </time>
+
+          <details
+            v-if="props.referenceAudio"
+            ref="playbackSourceMenu"
+            class="playback-source-menu"
+            aria-label="Playback source menu"
+          >
+            <summary aria-label="Playback source">{{ playbackSourceLabel }}</summary>
+            <div class="playback-source-options" role="menu">
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-label="Score"
+                :aria-checked="playbackMode === 'score'"
+                @click="handlePlaybackMode('score')"
+              >
+                <span aria-hidden="true">{{ playbackMode === 'score' ? '✓' : '' }}</span>
+                Score
+              </button>
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-label="Original Piano"
+                :aria-checked="playbackMode === 'reference'"
+                @click="handlePlaybackMode('reference')"
+              >
+                <span aria-hidden="true">{{ playbackMode === 'reference' ? '✓' : '' }}</span>
+                Original Piano
+              </button>
+            </div>
+          </details>
+          <span v-else class="playback-source-label" aria-label="Playback source">Score</span>
+        </div>
 
         <PlaybackTempoControl
           :model-value="playbackBpm"
           :source-bpm="sourceBpm"
           :disabled="playbackStatus === 'loading'"
           @update:model-value="handleTempoChange"
-        />
-
-        <audio
-          v-if="props.referenceAudioSrc"
-          class="reference-audio"
-          controls
-          preload="metadata"
-          aria-label="Original piano playback"
-          :src="props.referenceAudioSrc"
         />
 
         <div
@@ -245,7 +274,6 @@ function handleExportPdf(): void {
             :version="currentVersion"
             :playback-position="playbackPosition"
             :show-playback-position="showPlaybackPosition"
-            @play-measure="handlePlayMeasure"
             @seek-measure="handleSeekMeasure"
           />
           <template #fallback>
@@ -267,7 +295,7 @@ function handleExportPdf(): void {
 }
 .score-workspace.ready {
   display: grid;
-  grid-template-rows: 52px 53px minmax(0, 1fr);
+  grid-template-rows: 52px 70px minmax(0, 1fr);
 }
 .score-toolbar {
   display: flex;
@@ -319,8 +347,8 @@ function handleExportPdf(): void {
   top: 0;
   z-index: 5;
   display: grid;
-  height: 53px;
-  grid-template-columns: auto minmax(120px, 1fr) auto auto minmax(180px, 260px) auto;
+  height: 70px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid rgba(0,0,0,.09);
@@ -349,6 +377,22 @@ function handleExportPdf(): void {
   cursor: pointer;
 }
 .version-switcher button.active { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, .14); }
+.version-switcher button:focus-visible,
+.playback-source-menu summary:focus-visible,
+.playback-source-options button:focus-visible,
+.transport button:focus-visible,
+.download-button:focus-visible {
+  outline: 2px solid #007aff;
+  outline-offset: 2px;
+}
+.player-controls {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  grid-template-rows: 32px 18px;
+  align-items: center;
+  column-gap: 10px;
+}
 .transport { display: flex; gap: 4px; }
 .transport button {
   display: grid;
@@ -363,7 +407,61 @@ function handleExportPdf(): void {
 .transport button:disabled { color: #aeaeb2; cursor: default; }
 .overall-progress { width: 100%; accent-color: #1d1d1f; }
 time { color: #6e6e73; font-size: .72rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.reference-audio { width: 100%; height: 32px; }
+.playback-source-menu,
+.playback-source-label {
+  position: relative;
+  grid-row: 2;
+  grid-column: 1 / -1;
+  justify-self: center;
+  color: #6e6e73;
+  font-size: .7rem;
+  line-height: 18px;
+}
+.playback-source-menu summary {
+  border-radius: 5px;
+  padding: 0 16px 0 6px;
+  cursor: pointer;
+  list-style: none;
+}
+.playback-source-menu summary::-webkit-details-marker { display: none; }
+.playback-source-menu summary::after {
+  position: absolute;
+  top: 0;
+  right: 5px;
+  content: '⌄';
+}
+.playback-source-menu summary:hover { background: rgba(0,0,0,.055); color: #1d1d1f; }
+.playback-source-options {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 5px);
+  left: 50%;
+  display: grid;
+  width: max-content;
+  min-width: 150px;
+  gap: 2px;
+  border: 1px solid rgba(0,0,0,.1);
+  border-radius: 9px;
+  background: rgba(250,250,252,.98);
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.16);
+  transform: translateX(-50%);
+}
+.playback-source-options button {
+  display: grid;
+  height: 30px;
+  grid-template-columns: 16px 1fr;
+  align-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0 10px 0 6px;
+  color: #1d1d1f;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.playback-source-options button:hover { background: #e8e8ed; }
 .blocking,
 .playback-error {
   margin: 0;
@@ -377,10 +475,9 @@ time { color: #6e6e73; font-size: .72rem; font-variant-numeric: tabular-nums; wh
 .loading { color: #6e6e73; }
 .score-stage { min-height: 0; overflow: auto; padding: 20px; }
 @media (max-width: 1080px) {
-  .score-controls { height: auto; grid-template-columns: auto 1fr auto auto; }
-  .score-controls :deep(.tempo-control) { grid-column: 1 / -1; }
-  .reference-audio { grid-column: 1 / -1; }
-  .version-switcher { grid-column: 4; grid-row: 1; }
+  .score-controls { height: auto; grid-template-columns: minmax(0, 1fr) auto; }
+  .score-controls :deep(.tempo-control) { grid-column: 2; }
+  .version-switcher { grid-column: 1 / -1; }
 }
 @media (max-width: 620px) {
   .score-workspace.ready {
@@ -388,7 +485,8 @@ time { color: #6e6e73; font-size: .72rem; font-variant-numeric: tabular-nums; wh
     min-height: 720px;
     grid-template-rows: 52px auto minmax(0, 1fr);
   }
-  .score-controls { height: auto; grid-template-columns: auto minmax(100px, 1fr) auto; }
+  .score-controls { height: auto; grid-template-columns: minmax(0, 1fr) auto; }
+  .version-switcher { grid-column: 1 / -1; grid-row: auto; }
   .transport .stop { display: none; }
   .score-stage { height: auto; max-height: 720px; padding: 12px; }
 }

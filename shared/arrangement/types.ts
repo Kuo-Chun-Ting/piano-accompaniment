@@ -10,6 +10,7 @@ export type ScoreEvent = {
   startBeat: number
   durationBeats: number
   notes: ScoreNote[]
+  isSpacer?: true
   chordSymbol?: string
 }
 

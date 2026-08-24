@@ -5,6 +5,10 @@ from collections.abc import Iterable
 from typing import Protocol
 
 from faster_whisper import WhisperModel
+from opencc import OpenCC
+
+
+TRADITIONAL_CHINESE = OpenCC("s2t")
 
 
 class WhisperSegment(Protocol):
@@ -48,7 +52,7 @@ def main() -> int:
 def build_segments(segments: Iterable[WhisperSegment]) -> list[dict[str, float | str]]:
     result: list[dict[str, float | str]] = []
     for segment in segments:
-        text = " ".join(segment.text.split())
+        text = TRADITIONAL_CHINESE.convert(" ".join(segment.text.split()))
         if not text or segment.end <= segment.start or segment.no_speech_prob >= 0.6:
             continue
         result.append({

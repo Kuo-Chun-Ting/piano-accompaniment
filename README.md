@@ -70,6 +70,24 @@ npm run dev
 
 Open the local URL shown by Nuxt. The analysis model is selected in the application.
 
+## Audio-to-score MVP
+
+Run the MVP with one WAV path:
+
+```bash
+npm run audio:score -- "/absolute/path/to/recording.wav"
+```
+
+The command creates or overwrites `.audio-score/<recording-name>/` beside the WAV file. Open its `index.html` to view and play the score.
+
+Project samples:
+
+```bash
+npm run audio:score -- "./安靜.wav"
+npm run audio:score -- "./楓.wav"
+npm run audio:score:verify
+```
+
 ## Testing
 
 ```bash

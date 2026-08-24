@@ -21,6 +21,7 @@ test('test_transcribeLyrics_when_model_returns_segments_then_writes_timed_lyrics
   mkdirSync(stubDirectory)
   writeFileSync(inputPath, 'fixture')
   writeFileSync(join(stubDirectory, 'faster_whisper.py'), buildFasterWhisperStub())
+  writeFileSync(join(stubDirectory, 'opencc.py'), buildOpenCcStub())
 
   // Act
   execFileSync('python3', [
@@ -82,8 +83,19 @@ class WhisperModel:
             "word_timestamps": False,
         }
         return iter([
-            Segment(8.25, 10.5, " 只剩下鋼琴陪我談了一天 ", 0.05),
+            Segment(8.25, 10.5, " 只剩下钢琴陪我谈了一天 ", 0.05),
             Segment(11.0, 12.0, "不該出現", 0.95),
         ]), Info()
+`
+}
+
+function buildOpenCcStub(): string {
+  return `
+class OpenCC:
+    def __init__(self, config):
+        assert config == "s2t"
+
+    def convert(self, text):
+        return text.replace("钢", "鋼").replace("谈", "談")
 `
 }

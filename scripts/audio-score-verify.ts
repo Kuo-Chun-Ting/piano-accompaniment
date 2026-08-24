@@ -63,6 +63,7 @@ async function verifyCase(testCase: VerificationCase) {
     version: score.version,
     bpm: score.tempo,
     originSeconds,
+    beatSeconds: structure.beats,
     notes: notes.notes,
     pedalEvents: notes.pedalEvents,
   })

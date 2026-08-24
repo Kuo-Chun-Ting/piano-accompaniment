@@ -38,7 +38,7 @@
     </thead>
     <tbody>
       <tr>
-        <td class="type" rowspan="194">Unit</td>
+        <td class="type" rowspan="228">Unit</td>
         <td class="file" rowspan="11"><code>tests/unit/arrangement/generateArrangement.test.ts</code></td>
         <td class="scope" rowspan="11">輸入 confirmed chart 與 style；預期輸出可播放的伴奏 score、節拍事件、歌詞 cue 與錯誤資訊。</td>
         <td class="count" rowspan="11">11</td>
@@ -97,9 +97,9 @@
         <td class="io">預期輸出 blocking issue。</td>
       </tr>
       <tr>
-        <td class="file" rowspan="22"><code>tests/unit/audio-transcription/midiToScore.test.ts</code></td>
-        <td class="scope" rowspan="22">輸入轉錄音符、踏板事件、歌詞時間、BPM、錄音長度與偵測強拍；預期以 staff、voice、event、note 與局部連音穩定輸出完整譜面。</td>
-        <td class="count" rowspan="22">22</td>
+        <td class="file" rowspan="34"><code>tests/unit/audio-transcription/midiToScore.test.ts</code></td>
+        <td class="scope" rowspan="34">輸入轉錄音符、踏板事件、歌詞時間、BPM、錄音長度與偵測拍點；預期每個 staff 以單一 voice、event、note 與局部連音穩定輸出完整譜面。</td>
+        <td class="count" rowspan="34">34</td>
         <td class="function"><code>test_midiNumberToPitch_when_midi_number_is_valid_then_returns_scientific_pitch</code></td>
         <td class="io">輸入 MIDI 40、60、61、84</td>
         <td class="io">預期輸出 E2、C4、C#4、C6。</td>
@@ -120,19 +120,69 @@
         <td class="io">預期組成一個 staff voice 和弦事件。</td>
       </tr>
       <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_note_onsets_are_within_fifty_milliseconds_then_groups_one_chord_attack</code></td>
+        <td class="io">輸入起音相差 40 ms 的兩音</td>
+        <td class="io">預期合併成一次和弦攻擊。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_note_onsets_are_eighty_milliseconds_apart_then_keeps_one_chord_attack</code></td>
+        <td class="io">輸入起音相差 80 ms 的兩音</td>
+        <td class="io">預期保留為一次和弦攻擊。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_note_onsets_are_over_one_hundred_milliseconds_apart_then_preserves_two_attacks</code></td>
+        <td class="io">輸入起音相差 110 ms 的兩音</td>
+        <td class="io">預期保留兩次攻擊。</td>
+      </tr>
+      <tr>
         <td class="function"><code>test_convertTranscriptionToScore_when_chord_notes_share_duration_then_builds_one_staff_voice_event</code></td>
         <td class="io">輸入起訖時間相同的 G4、C5、E5</td>
         <td class="io">預期三音存在同一個 event。</td>
       </tr>
       <tr>
-        <td class="function"><code>test_convertTranscriptionToScore_when_simultaneous_notes_have_different_durations_then_uses_partial_ties_in_one_voice</code></td>
-        <td class="io">輸入同時開始但長度不同的三音</td>
-        <td class="io">預期用一條 voice 與 note-level ties 表達不同放鍵時間。</td>
+        <td class="function"><code>test_simplifyTiedEvents_when_identical_chord_is_one_plus_half_beats_then_uses_one_dotted_event</code></td>
+        <td class="io">輸入以延音線連接的 1 拍與 0.5 拍相同和弦</td>
+        <td class="io">預期合併成一顆 1.5 拍附點和弦。</td>
       </tr>
       <tr>
-        <td class="function"><code>test_convertTranscriptionToScore_when_sustained_note_overlaps_new_onset_then_marks_partial_ties</code></td>
-        <td class="io">輸入延音中的 C6 與稍後按下的 E5、B5</td>
-        <td class="io">預期 C6 以局部連音跨過新 onset，不被重新彈奏。</td>
+        <td class="function"><code>test_simplifyTiedEvents_when_tie_crosses_middle_of_measure_then_keeps_readable_beat_boundary</code></td>
+        <td class="io">輸入從第二拍跨越第三拍的 1.5 拍延音</td>
+        <td class="io">預期保留延音線以顯示 4/4 中間拍點。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_pedaled_chord_releases_are_staggered_then_uses_one_common_notated_duration</code></td>
+        <td class="io">輸入同時起音、分批放開的踏板四音和弦</td>
+        <td class="io">預期四音使用共同時值。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_one_chord_attack_has_staggered_releases_then_keeps_one_notated_attack</code></td>
+        <td class="io">輸入同次擊鍵、放鍵時間不同的三音和弦</td>
+        <td class="io">預期只畫一次和弦，使用共同譜面時值。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_chord_release_quantizes_to_one_and_quarter_beats_then_uses_one_readable_attack</code></td>
+        <td class="io">輸入量化後為 1.25 拍的單次踏板和弦</td>
+        <td class="io">預期只畫一次一拍和弦，不產生延音碎片。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_four_attacks_fit_one_beat_then_keeps_sixteenth_note_positions</code></td>
+        <td class="io">輸入一拍內四次獨立擊鍵</td>
+        <td class="io">預期以十六分音符位置保留四次擊鍵。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_chord_note_crosses_later_attack_then_ends_chord_before_new_attack</code></td>
+        <td class="io">輸入和弦尾音跨過後續擊鍵，並提供踏板區間</td>
+        <td class="io">預期和弦在新擊鍵前結束，延續交由踏板表達。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_resonant_note_crosses_later_attacks_then_keeps_one_readable_voice</code></td>
+        <td class="io">輸入聲音尾端跨過後續擊鍵的 C5，以及後續 F5、G5、A5</td>
+        <td class="io">預期只產生一條可讀 voice，不把聲音尾端誤判為獨立聲部。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_resonant_note_overlaps_chord_then_keeps_one_readable_voice</code></td>
+        <td class="io">輸入聲音尾端跨過後續 E5、B5 和弦的 C6</td>
+        <td class="io">預期只產生一條可讀 voice，保留兩次實際擊鍵。</td>
       </tr>
       <tr>
         <td class="function"><code>test_convertTranscriptionToScore_when_notes_span_middle_c_then_separates_staves</code></td>
@@ -210,9 +260,19 @@
         <td class="io">預期依偵測強拍把歌詞放入第二小節，不留在前一小節尾端。</td>
       </tr>
       <tr>
-        <td class="file" rowspan="7"><code>tests/unit/audio-transcription/scoreVerification.test.ts</code></td>
-        <td class="scope" rowspan="7">輸入量化後的轉錄資料與最終 score；預期找出音符、延音、譜面結構、單手跨度與踏板差異。</td>
-        <td class="count" rowspan="7">7</td>
+        <td class="function"><code>test_convertTranscriptionToScore_when_detected_beats_drift_then_places_late_piano_entry_on_matching_beat</code></td>
+        <td class="io">輸入與固定 BPM 偏移的逐拍時間及第三拍才進入的鋼琴音</td>
+        <td class="io">預期依實際拍點在前兩拍補休止符，第三拍才畫音符。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_convertTranscriptionToScore_when_detected_beats_drift_then_aligns_pedal_to_actual_beats</code></td>
+        <td class="io">輸入與固定 BPM 偏移的逐拍時間及踏板按放時間</td>
+        <td class="io">預期踏板區間對齊實際拍點，不依平均 BPM 漂移。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="14"><code>tests/unit/audio-transcription/scoreVerification.test.ts</code></td>
+        <td class="scope" rowspan="14">輸入量化後的轉錄資料、實際拍點與最終 score；預期找出音符、延音、譜面結構、單手跨度與踏板差異。</td>
+        <td class="count" rowspan="14">14</td>
         <td class="function"><code>test_verifyScorePlayback_when_score_has_missing_and_extra_notes_then_reports_both_differences</code></td>
         <td class="io">輸入缺音與多音的播放排程</td>
         <td class="io">預期同時回報 missing 與 unexpected note。</td>
@@ -223,6 +283,31 @@
         <td class="io">預期回報實際與預期延音長度。</td>
       </tr>
       <tr>
+        <td class="function"><code>test_verifyScorePlayback_when_detected_beats_drift_then_compares_using_actual_timeline</code></td>
+        <td class="io">輸入與平均 BPM 偏移的實際逐拍時間</td>
+        <td class="io">預期驗證器與產譜使用相同拍點，不誤報缺音或多音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_verifyScorePlayback_when_chord_onsets_cross_quantization_boundary_then_compares_one_attack</code></td>
+        <td class="io">輸入跨量化邊界但相差 80 ms 的和弦音</td>
+        <td class="io">預期以同一次攻擊比對，不誤報缺音或多音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_verifyScorePlayback_when_pedaled_chord_uses_common_notated_duration_then_verifies_attacks_and_pitches</code></td>
+        <td class="io">輸入放鍵時間不同的踏板四音和弦</td>
+        <td class="io">預期驗證擊鍵與音高，不誤判共同譜面時值。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_verifyScorePlayback_when_acoustic_note_tail_crosses_next_attack_then_does_not_treat_tail_as_a_new_voice</code></td>
+        <td class="io">輸入跨過後續擊鍵的聲音尾端</td>
+        <td class="io">預期驗證兩次擊鍵，不把聲音尾端要求成額外 voice。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_verifyScorePlayback_when_one_chord_has_staggered_acoustic_releases_then_compares_the_single_attack</code></td>
+        <td class="io">輸入同次和弦攻擊與不同聲音結束時間</td>
+        <td class="io">預期驗證一次和弦攻擊，不誤報譜面共同時值。</td>
+      </tr>
+      <tr>
         <td class="function"><code>test_verifyScoreNotation_when_measure_tie_and_pedal_are_invalid_then_reports_each_issue</code></td>
         <td class="io">輸入拍數、連音與踏板都不合法的 score</td>
         <td class="io">預期回報三種譜面問題。</td>
@@ -231,6 +316,16 @@
         <td class="function"><code>test_verifyScoreNotation_when_tie_continues_in_another_voice_then_accepts_it</code></td>
         <td class="io">輸入跨小節且換 voice 的同音高連結</td>
         <td class="io">預期依絕對拍點接受合法連結。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_verifyScoreNotation_when_identical_chord_tie_can_be_one_dotted_note_then_reports_redundant_tie</code></td>
+        <td class="io">輸入可合併成 1.5 拍附點和弦的相同延音事件</td>
+        <td class="io">預期回報多餘延音線。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_verifyScoreNotation_when_short_chord_release_is_split_into_tied_fragment_then_reports_redundant_tie</code></td>
+        <td class="io">輸入 1 拍和弦連接 0.25 拍相同和弦</td>
+        <td class="io">預期回報不必要的短和弦延音碎片。</td>
       </tr>
       <tr>
         <td class="function"><code>test_verifyScoreNotation_when_staff_chord_exceeds_major_tenth_then_reports_unplayable_span</code></td>
@@ -270,11 +365,11 @@
       </tr>
       <tr>
         <td class="file"><code>tests/unit/audio-transcription/transcribeLyrics.test.ts</code></td>
-        <td class="scope">執行真實 Python 歌詞腳本並隔離 faster-whisper；預期輸出有效句子時間並排除無人聲片段。</td>
+        <td class="scope">執行真實 Python 歌詞腳本並隔離 faster-whisper 與 OpenCC；預期輸出有效繁體中文句子時間並排除無人聲片段。</td>
         <td class="count">1</td>
         <td class="function"><code>test_transcribeLyrics_when_model_returns_segments_then_writes_timed_lyrics</code></td>
         <td class="io">輸入一段有效歌詞與一段高 no-speech 機率結果</td>
-        <td class="io">預期 JSON 只保留整理過的有效歌詞與時間。</td>
+        <td class="io">預期 JSON 只保留轉為繁體中文的有效歌詞與時間。</td>
       </tr>
       <tr>
         <td class="file"><code>tests/unit/audio-transcription/runtime.test.ts</code></td>
@@ -293,9 +388,9 @@
         <td class="io">預期 escape 後作為純文字 HTML title。</td>
       </tr>
       <tr>
-        <td class="file" rowspan="6"><code>tests/unit/audio-transcription/viewerData.test.ts</code></td>
-        <td class="scope" rowspan="6">輸入獨立 viewer 的標題、BPM、ScoreVersion 與原始鋼琴音軌；預期接受完整樂譜並拒絕無法渲染的資料。</td>
-        <td class="count" rowspan="6">6</td>
+        <td class="file" rowspan="9"><code>tests/unit/audio-transcription/viewerData.test.ts</code></td>
+        <td class="scope" rowspan="9">輸入獨立 viewer 的標題、BPM、ScoreVersion 與原始鋼琴音軌；預期接受完整樂譜並拒絕無法渲染的資料。</td>
+        <td class="count" rowspan="9">9</td>
         <td class="function"><code>test_parseViewerData_when_payload_is_valid_then_returns_typed_score</code></td>
         <td class="io">輸入合法 viewer score payload</td>
         <td class="io">預期回傳型別化資料。</td>
@@ -321,9 +416,50 @@
         <td class="io">預期 validation 後仍完整保留調號。</td>
       </tr>
       <tr>
-        <td class="function"><code>test_parseViewerData_when_piano_audio_is_provided_then_preserves_second_playback_source</code></td>
-        <td class="io">輸入 piano.wav 相對路徑</td>
-        <td class="io">預期保留原始鋼琴播放來源。</td>
+        <td class="function"><code>test_parseViewerData_when_score_contains_dotted_duration_then_preserves_it</code></td>
+        <td class="io">輸入含三拍附點二分音符的 viewer payload</td>
+        <td class="io">預期 validation 後仍保留附點時值。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseViewerData_when_score_contains_sixteenth_notes_then_preserves_complete_measure</code></td>
+        <td class="io">輸入十六個十六分音符的完整小節</td>
+        <td class="io">預期 validation 後完整保留。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseViewerData_when_score_contains_spacer_then_preserves_it</code></td>
+        <td class="io">輸入含不可見補拍 spacer 的 viewer payload</td>
+        <td class="io">預期 validation 後仍保留 spacer 標記。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseViewerData_when_reference_audio_is_provided_then_preserves_synchronization_timeline</code></td>
+        <td class="io">輸入 piano.wav、第一強拍、來源 BPM 與逐拍時間</td>
+        <td class="io">預期完整保留原曲鋼琴同步資料。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="3"><code>tests/unit/audio/referenceAudio.test.ts</code></td>
+        <td class="scope" rowspan="3">輸入樂譜拍點、原曲實際拍點與速度；預期雙向轉換播放位置並計算保持音高的播放倍率。</td>
+        <td class="count" rowspan="3">3</td>
+        <td class="function"><code>test_getReferenceAudioSeconds_when_seeking_score_beat_then_uses_detected_beat_timeline</code></td>
+        <td class="io">輸入樂譜第 1.5 拍</td>
+        <td class="io">預期插值到對應原曲秒數。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getReferenceAudioBeatOffset_when_audio_is_playing_then_returns_shared_score_position</code></td>
+        <td class="io">輸入原曲目前秒數</td>
+        <td class="io">預期反算共用樂譜拍點。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getReferenceAudioPlaybackRate_when_tempo_changes_then_scales_from_source_bpm</code></td>
+        <td class="io">輸入來源與目標 BPM</td>
+        <td class="io">預期回傳目標 BPM／來源 BPM。</td>
+      </tr>
+      <tr>
+        <td class="file"><code>tests/unit/audio/pianoPlaybackReference.test.ts</code></td>
+        <td class="scope">輸入原曲鋼琴同步資料；預期切換模式、播放、跳轉與改速度時沿用同一條樂譜時間軸。</td>
+        <td class="count">1</td>
+        <td class="function"><code>test_usePianoPlayback_when_reference_mode_plays_seeks_and_changes_tempo_then_keeps_shared_timeline</code></td>
+        <td class="io">輸入逐拍時間並跳到樂譜第 2 拍、將 120 BPM 改為 96 BPM</td>
+        <td class="io">預期原曲跳到對應秒數、倍率為 0.8 且保持音高。</td>
       </tr>
       <tr>
         <td class="file" rowspan="6"><code>tests/unit/audio-transcription/cli.test.ts</code></td>
@@ -372,9 +508,9 @@
         <td class="io">預期每個支援音高都有 URL。</td>
       </tr>
       <tr>
-        <td class="file" rowspan="13"><code>tests/unit/audio/playbackSchedule.test.ts</code></td>
-        <td class="scope" rowspan="13">輸入 notation score、踏板區間、播放秒數與 tempo；預期只依樂譜輸出正確播放排程與位置。</td>
-        <td class="count" rowspan="13">13</td>
+        <td class="file" rowspan="14"><code>tests/unit/audio/playbackSchedule.test.ts</code></td>
+        <td class="scope" rowspan="14">輸入 notation score、踏板區間、播放秒數與 tempo；預期只依樂譜輸出正確播放排程與位置。</td>
+        <td class="count" rowspan="14">14</td>
         <td class="function"><code>test_buildPlaybackSchedule_when_score_has_two_measures_then_offsets_second_measure</code></td>
         <td class="io">輸入兩小節 score</td>
         <td class="io">預期第二小節事件時間正確位移。</td>
@@ -388,6 +524,11 @@
         <td class="function"><code>test_buildPlaybackSchedule_when_tie_continues_in_another_voice_then_keeps_one_attack</code></td>
         <td class="io">輸入跨小節且換 voice 的延音</td>
         <td class="io">預期只產生一次擊鍵並延長播放。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildPlaybackSchedule_when_earlier_same_pitch_is_in_later_voice_then_resolves_ties_chronologically</code></td>
+        <td class="io">輸入較早同音位於後列 voice，後續音符跨小節延音</td>
+        <td class="io">預期依拍點處理延音，只保留兩次實際擊鍵。</td>
       </tr>
       <tr>
         <td class="function"><code>test_buildPlaybackSchedule_when_next_note_is_not_tied_from_previous_then_keeps_repeated_attack</code></td>
@@ -1115,9 +1256,9 @@
         <td class="io">預期呼叫 print 並還原 page title。</td>
       </tr>
       <tr>
-        <td class="file" rowspan="7"><code>tests/unit/ui/scoreSystems.test.ts</code></td>
-        <td class="scope" rowspan="7">輸入 score measures 與播放進度；預期輸出 systems、system progress 與 seek target。</td>
-        <td class="count" rowspan="7">7</td>
+        <td class="file" rowspan="16"><code>tests/unit/ui/scoreSystems.test.ts</code></td>
+        <td class="scope" rowspan="16">輸入 score measures、譜面密度、文字邊界與播放進度；預期輸出可讀的 systems、寬度、文字位置、system progress 與 seek target。</td>
+        <td class="count" rowspan="16">16</td>
         <td class="function"><code>test_groupScoreMeasures_when_measure_count_exceeds_system_size_then_groups_continuously</code></td>
         <td class="io">輸入超過 system size 的小節</td>
         <td class="io">預期連續分組。</td>
@@ -1133,9 +1274,44 @@
         <td class="io">預期每 system 四小節。</td>
       </tr>
       <tr>
+        <td class="function"><code>test_buildScoreSystems_when_measure_is_dense_then_gives_it_more_space_and_wraps_earlier</code></td>
+        <td class="io">輸入含 16 個節奏位置的密集小節</td>
+        <td class="io">預期給兩倍寬度並提早換行。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildScoreSystems_when_both_staves_have_distinct_rhythmic_positions_then_counts_combined_density</code></td>
+        <td class="io">輸入上下譜表各自不同的節奏位置</td>
+        <td class="io">預期合併計算密度，避免上下譜表擠在固定寬度。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreSystemMeasureWidths_when_final_system_is_short_then_keeps_standard_measure_width</code></td>
+        <td class="io">輸入只剩一小節的最後一排</td>
+        <td class="io">預期維持標準四分之一排寬，不拉滿整排。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreSystemMeasureWidths_when_non_final_system_wraps_early_then_fills_content_width</code></td>
+        <td class="io">輸入因下一個密集小節而提早換行的三小節 system</td>
+        <td class="io">預期依原始比例重新分配寬度並填滿整排。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_fitTextWithinBounds_when_text_would_overflow_right_edge_then_shifts_it_left</code></td>
+        <td class="io">輸入靠近右界的長歌詞</td>
+        <td class="io">預期向左移動，完整保留在譜面內。</td>
+      </tr>
+      <tr>
         <td class="function"><code>test_getScoreSystemProgress_when_position_is_inside_system_then_returns_relative_progress</code></td>
         <td class="io">輸入 system 內播放位置</td>
         <td class="io">預期輸出相對進度。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreSystemProgress_when_measure_widths_differ_then_uses_layout_units</code></td>
+        <td class="io">輸入寬度單位不同的小節與小節內播放位置</td>
+        <td class="io">預期進度對齊實際小節寬度。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreSystemProgress_when_final_system_is_short_then_matches_rendered_measure_width</code></td>
+        <td class="io">輸入未填滿整排的最後一個 system</td>
+        <td class="io">預期進度點位於實際小節範圍。</td>
       </tr>
       <tr>
         <td class="function"><code>test_getScoreSystemProgress_when_position_is_outside_system_then_clamps_progress</code></td>
@@ -1146,6 +1322,16 @@
         <td class="function"><code>test_getScoreSystemSeekTarget_when_progress_is_inside_system_then_maps_to_measure_position</code></td>
         <td class="io">輸入 system 內進度</td>
         <td class="io">預期映射到小節位置。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreSystemSeekTarget_when_measure_widths_differ_then_uses_layout_units</code></td>
+        <td class="io">輸入寬度單位不同的小節與點擊位置</td>
+        <td class="io">預期映射到正確小節內進度。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_getScoreSystemSeekTarget_when_final_system_is_short_then_matches_rendered_measure_width</code></td>
+        <td class="io">輸入最後一排的譜面內與空白區點擊</td>
+        <td class="io">預期譜面內精確跳轉，空白區停在樂譜結尾。</td>
       </tr>
       <tr>
         <td class="function"><code>test_getScoreSystemSeekTarget_when_progress_is_complete_then_maps_to_final_measure_end</code></td>
@@ -1181,7 +1367,7 @@
         <td class="io">預期移除 snapshot。</td>
       </tr>
       <tr>
-        <td class="type" rowspan="31">Component</td>
+        <td class="type" rowspan="37">Component</td>
         <td class="file" rowspan="6"><code>tests/component/ArrangementGrid.test.ts</code></td>
         <td class="scope" rowspan="6">輸入 arrangement、tempo、原始鋼琴音軌、版本切換設定與播放操作；預期兩種播放模式正確顯示。</td>
         <td class="count" rowspan="6">6</td>
@@ -1200,9 +1386,9 @@
         <td class="io">預期隱藏版本按鈕並保留播放、停止、進度與 BPM。</td>
       </tr>
       <tr>
-        <td class="function"><code>test_ArrangementGrid_when_reference_audio_is_available_then_renders_original_piano_player</code></td>
-        <td class="io">輸入 piano.wav 路徑</td>
-        <td class="io">預期顯示與樂譜播放分開的原始鋼琴播放器。</td>
+        <td class="function"><code>test_ArrangementGrid_when_reference_audio_is_available_then_selects_source_below_transport</code></td>
+        <td class="io">輸入原曲鋼琴同步資料，從 Player 下方選擇 Original Piano</td>
+        <td class="io">預期只有一組播放控制，來源選單位於 Player 內並切到原曲鋼琴。</td>
       </tr>
       <tr>
         <td class="function"><code>test_ArrangementGrid_when_tempo_changes_then_forwards_selected_version_and_bpm</code></td>
@@ -1213,6 +1399,14 @@
         <td class="function"><code>test_ArrangementGrid_when_arrangement_has_blocking_issue_then_hides_score_controls</code></td>
         <td class="io">輸入有 blocking issue 的 arrangement</td>
         <td class="io">預期不顯示 score controls。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="1"><code>tests/component/PianoScore.test.ts</code></td>
+        <td class="scope" rowspan="1">輸入五線譜與 system 點擊座標；預期輸出精確的小節與小節內進度。</td>
+        <td class="count" rowspan="1">1</td>
+        <td class="function"><code>test_PianoScore_when_system_is_clicked_then_emits_exact_measure_position</code></td>
+        <td class="io">點擊四小節 system 的第二小節中央</td>
+        <td class="io">預期 emit 第二小節與 50% 小節進度。</td>
       </tr>
       <tr>
         <td class="file" rowspan="4"><code>tests/component/ChartComparison.test.ts</code></td>
@@ -1257,7 +1451,7 @@
       </tr>
       <tr>
         <td class="file" rowspan="2"><code>tests/component/AudioScoreGeneratedOutput.test.ts</code></td>
-        <td class="scope" rowspan="2">輸入安靜與楓的實際產物；預期每個 staff 使用整理後的單一時間線，且每個 system 都能完成雙譜表渲染。</td>
+        <td class="scope" rowspan="2">輸入安靜與楓的實際產物；預期每個 staff 的 voices 都能完成雙譜表渲染。</td>
         <td class="count" rowspan="2">2</td>
         <td class="function"><code>test_AudioScoreGeneratedOutput_when_安靜_is_generated_then_renders_every_system</code></td>
         <td class="io">輸入安靜 score.json</td>
@@ -1269,17 +1463,27 @@
         <td class="io">預期所有 system 都渲染兩行五線譜。</td>
       </tr>
       <tr>
-        <td class="file" rowspan="9"><code>tests/component/PianoScoreSystem.test.ts</code></td>
-        <td class="scope" rowspan="9">輸入含符槓、完整或局部連音、踏板、歌詞、多 voice、雙 staff 同拍、臨時記號與調號的 ScoreSystem；預期 VexFlow 正確分層渲染。</td>
-        <td class="count" rowspan="9">9</td>
+        <td class="file" rowspan="14"><code>tests/component/PianoScoreSystem.test.ts</code></td>
+        <td class="scope" rowspan="14">輸入含符槓、連音、附點音符、踏板、歌詞、多 voice、雙 staff 同拍、臨時記號與調號的 ScoreSystem；預期 VexFlow 正確分層渲染。</td>
+        <td class="count" rowspan="14">14</td>
         <td class="function"><code>test_PianoScoreSystem_when_eighth_notes_are_beamed_then_does_not_render_flags_on_beamed_notes</code></td>
         <td class="io">輸入連續八個八分音符</td>
         <td class="io">預期有符槓且沒有殘留旗子。</td>
       </tr>
       <tr>
+        <td class="function"><code>test_PianoScoreSystem_when_sixteenth_notes_are_beamed_then_renders_complete_notes</code></td>
+        <td class="io">輸入連續十六個十六分音符</td>
+        <td class="io">預期完整顯示音符與符槓，不殘留旗子。</td>
+      </tr>
+      <tr>
         <td class="function"><code>test_PianoScoreSystem_when_note_is_tied_then_renders_stave_tie</code></td>
         <td class="io">輸入兩個標記相連的相同音高事件</td>
         <td class="io">預期 SVG 包含一條 VexFlow 延音線。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PianoScoreSystem_when_note_has_dotted_duration_then_renders_one_notehead_with_dot</code></td>
+        <td class="io">輸入三拍的 C5</td>
+        <td class="io">預期 SVG 顯示單一附點二分音符，不產生連音線。</td>
       </tr>
       <tr>
         <td class="function"><code>test_PianoScoreSystem_when_one_chord_pitch_continues_then_renders_partial_ties</code></td>
@@ -1290,6 +1494,11 @@
         <td class="function"><code>test_PianoScoreSystem_when_pedal_interval_is_visible_then_renders_pedal_line_without_text_symbols</code></td>
         <td class="io">輸入一段踏板區間</td>
         <td class="io">預期 SVG 顯示踏板線，不顯示 Ped. 與放踏板文字符號。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PianoScoreSystem_when_pedal_tail_at_system_boundary_is_too_short_then_omits_stray_mark</code></td>
+        <td class="io">輸入跨排且只剩不到半拍的踏板尾端</td>
+        <td class="io">預期省略無法辨讀的孤立短線。</td>
       </tr>
       <tr>
         <td class="function"><code>test_PianoScoreSystem_when_lyrics_are_visible_then_groups_them_for_geometry_validation</code></td>
@@ -1307,6 +1516,11 @@
         <td class="io">預期所有 voice event 都交給 VexFlow 渲染。</td>
       </tr>
       <tr>
+        <td class="function"><code>test_PianoScoreSystem_when_secondary_voice_has_spacer_then_does_not_render_rest_symbol</code></td>
+        <td class="io">輸入第二條 voice 的補拍 spacer</td>
+        <td class="io">預期只保留時間間距，不畫出休止符。</td>
+      </tr>
+      <tr>
         <td class="function"><code>test_PianoScoreSystem_when_accidental_repeats_in_measure_then_renders_it_once</code></td>
         <td class="io">輸入同一小節內重複的升記號</td>
         <td class="io">預期只在第一次出現時畫升記號。</td>
@@ -1315,6 +1529,11 @@
         <td class="function"><code>test_PianoScoreSystem_when_key_signature_is_flat_then_renders_signature_without_note_accidental</code></td>
         <td class="io">輸入 Bb 調號與 Bb 音符</td>
         <td class="io">預期高低音譜表都畫調號，音符旁不重複畫降記號。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_PianoScoreSystem_when_system_is_not_first_then_keeps_clefs_without_repeating_time_signature</code></td>
+        <td class="io">輸入第二排以後的雙譜表</td>
+        <td class="io">預期保留高低音譜號，但不重複顯示 4/4。</td>
       </tr>
       <tr>
         <td class="file" rowspan="4"><code>tests/component/PlaybackTempoControl.test.ts</code></td>
@@ -1382,7 +1601,7 @@
         <td class="count" rowspan="1">1</td>
         <td class="function"><code>generated audio score renders and plays with existing controls</code></td>
         <td class="io">預設輸入含八分音符 beam、跨音延音、踏板、歌詞與多系統的 fixture；可用 AUDIO_SCORE_VIEWER_PATH 改驗真實 MVP 產物</td>
-        <td class="io">預期五線譜、踏板線與歌詞依序分層且至少間隔 8px；沒有符桿溢出、多餘旗標或 page error，播放操作正常。</td>
+        <td class="io">預期五線譜、踏板線與歌詞依序分層且至少間隔 8px；沒有符桿溢出、多餘旗標或 page error；來源名稱置中於 Player 下方，Original Piano 可由譜面精確跳至小節內位置，雙模式共用播放鍵、進度跳轉與速度。</td>
       </tr>
       <tr>
         <td class="file" rowspan="2"><code>tests/e2e/studio.spec.ts</code></td>

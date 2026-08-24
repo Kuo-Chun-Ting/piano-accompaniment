@@ -23,6 +23,7 @@ export type TranscriptionInput = {
   bpm: number
   durationSeconds: number
   firstDownbeatSeconds?: number
+  beatSeconds?: number[]
   downbeatSeconds?: number[]
   measureCount?: number
 }

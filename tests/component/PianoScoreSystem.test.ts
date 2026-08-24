@@ -41,6 +41,23 @@ test('test_PianoScoreSystem_when_eighth_notes_are_beamed_then_does_not_render_fl
   expect(wrapper.findAll('.vf-flag')).toHaveLength(0)
 })
 
+test('test_PianoScoreSystem_when_sixteenth_notes_are_beamed_then_renders_complete_notes', async () => {
+  // Arrange
+  const sixteenthNotes = Array.from({ length: 16 }, (_, index) =>
+    buildEvent(1 + index * 0.25, 0.25, [`${['C', 'D', 'E', 'F'][index % 4]}4`]))
+
+  // Act
+  const wrapper = mount(PianoScoreSystem, {
+    props: { system: buildSystem(sixteenthNotes) },
+  })
+  await nextTick()
+
+  // Assert
+  expect(wrapper.findAll('.vf-stavenote').length).toBeGreaterThanOrEqual(16)
+  expect(wrapper.findAll('.vf-beam').length).toBeGreaterThan(0)
+  expect(wrapper.findAll('.vf-flag')).toHaveLength(0)
+})
+
 test('test_PianoScoreSystem_when_note_is_tied_then_renders_stave_tie', async () => {
   // Arrange
   const tiedNotes = [
@@ -56,6 +73,24 @@ test('test_PianoScoreSystem_when_note_is_tied_then_renders_stave_tie', async () 
 
   // Assert
   expect(wrapper.findAll('.vf-stavetie')).toHaveLength(1)
+})
+
+test('test_PianoScoreSystem_when_note_has_dotted_duration_then_renders_one_notehead_with_dot', async () => {
+  // Arrange
+  const notes = [
+    buildEvent(1, 3, ['C5']),
+    buildEvent(4, 1, []),
+  ]
+
+  // Act
+  const wrapper = mount(PianoScoreSystem, {
+    props: { system: buildSystem(notes) },
+  })
+  await nextTick()
+
+  // Assert
+  expect(wrapper.findAll('.vf-stavenote')[0]!.findAll('.vf-notehead text')).toHaveLength(2)
+  expect(wrapper.findAll('.vf-stavetie')).toHaveLength(0)
 })
 
 test('test_PianoScoreSystem_when_one_chord_pitch_continues_then_renders_partial_ties', async () => {
@@ -95,6 +130,24 @@ test('test_PianoScoreSystem_when_pedal_interval_is_visible_then_renders_pedal_li
   expect(wrapper.find('.vf-pedal-marking').exists()).toBe(true)
   expect(wrapper.text()).not.toContain('Ped.')
   expect(wrapper.text()).not.toContain('✱')
+})
+
+test('test_PianoScoreSystem_when_pedal_tail_at_system_boundary_is_too_short_then_omits_stray_mark', async () => {
+  // Arrange
+  const system = buildSystem([buildEvent(1, 4, ['C4'])])
+  system.startMeasureIndex = 4
+
+  // Act
+  const wrapper = mount(PianoScoreSystem, {
+    props: {
+      system,
+      pedalIntervals: [{ startBeatOffset: 15.5, endBeatOffset: 16.4 }],
+    },
+  })
+  await nextTick()
+
+  // Assert
+  expect(wrapper.find('.vf-pedal-marking').exists()).toBe(false)
 })
 
 test('test_PianoScoreSystem_when_lyrics_are_visible_then_groups_them_for_geometry_validation', async () => {
@@ -161,6 +214,27 @@ test('test_PianoScoreSystem_when_staff_has_multiple_voices_then_renders_every_vo
   expect(wrapper.findAll('.vf-stavenote')).toHaveLength(7)
 })
 
+test('test_PianoScoreSystem_when_secondary_voice_has_spacer_then_does_not_render_rest_symbol', async () => {
+  // Arrange
+  const spacer = {
+    ...buildEvent(1, 1, []),
+    isSpacer: true as const,
+  }
+  const trebleVoices = [
+    [buildEvent(1, 4, ['C5'])],
+    [spacer, buildEvent(2, 3, ['E5'])],
+  ]
+
+  // Act
+  const wrapper = mount(PianoScoreSystem, {
+    props: { system: buildSystem(trebleVoices[0]!, undefined, trebleVoices) },
+  })
+  await nextTick()
+
+  // Assert
+  expect(wrapper.findAll('.vf-stavenote')).toHaveLength(4)
+})
+
 test('test_PianoScoreSystem_when_accidental_repeats_in_measure_then_renders_it_once', async () => {
   // Arrange
   const trebleEvents = [
@@ -202,6 +276,22 @@ test('test_PianoScoreSystem_when_key_signature_is_flat_then_renders_signature_wi
   expect(noteAccidentals).toHaveLength(0)
 })
 
+test('test_PianoScoreSystem_when_system_is_not_first_then_keeps_clefs_without_repeating_time_signature', async () => {
+  // Arrange
+  const system = buildSystem([buildEvent(1, 4, ['C5'])])
+  system.startMeasureIndex = 4
+
+  // Act
+  const wrapper = mount(PianoScoreSystem, {
+    props: { system },
+  })
+  await nextTick()
+
+  // Assert
+  expect(wrapper.findAll('.vf-clef')).toHaveLength(2)
+  expect(wrapper.findAll('.vf-timesignature')).toHaveLength(0)
+})
+
 function buildSystem(
   trebleEvents: ScoreEvent[],
   bassEvents?: ScoreEvent[],
@@ -210,6 +300,8 @@ function buildSystem(
   return {
     startMeasureIndex: 0,
     measures: [buildMeasure(trebleVoices, bassEvents)],
+    measureLayoutUnits: [1],
+    isFinalSystem: true,
   }
 }
 

@@ -1,4 +1,4 @@
-import type { ScorePedalInterval, ScoreVersion } from '../arrangement/types'
+import type { ScoreNote, ScorePedalInterval, ScoreVersion } from '../arrangement/types'
 
 export const BEATS_PER_MEASURE = 4
 
@@ -31,6 +31,12 @@ export type PlaybackPosition = {
   measureProgress: number
   beat: number
   activeEventIds: string[]
+}
+
+type NotationEventInput = {
+  baseEvent: Omit<PlaybackEvent, 'pitches'>
+  notes: ScoreNote[]
+  sequence: number
 }
 
 export function buildPlaybackSchedule(version: ScoreVersion, bpm: number): PlaybackSchedule {
@@ -117,6 +123,42 @@ function buildNotationEvents(
   const playbackEvents: PlaybackEvent[] = []
   const tiedEventsByPitch = new Map<string, PlaybackEvent>()
 
+  for (const { baseEvent, notes } of collectNotationEvents(measures, secondsPerBeat)) {
+    if (notes.length === 0) {
+      playbackEvents.push({ ...baseEvent, pitches: [] })
+    }
+
+    for (const note of notes) {
+      const tieKey = `${baseEvent.staffId}:${note.pitch}`
+      const previous = tiedEventsByPitch.get(tieKey)
+      let current: PlaybackEvent
+      if (note.tieFromPrevious && previous) {
+        previous.durationBeats += baseEvent.durationBeats
+        previous.durationSeconds += baseEvent.durationBeats * secondsPerBeat
+        current = previous
+      } else {
+        current = { ...baseEvent, pitches: [note.pitch] }
+        playbackEvents.push(current)
+      }
+
+      if (note.tieToNext) {
+        tiedEventsByPitch.set(tieKey, current)
+      } else {
+        tiedEventsByPitch.delete(tieKey)
+      }
+    }
+  }
+
+  return playbackEvents
+}
+
+function collectNotationEvents(
+  measures: ScoreVersion['measures'],
+  secondsPerBeat: number,
+): NotationEventInput[] {
+  const events: NotationEventInput[] = []
+  let sequence = 0
+
   measures.forEach((measure, measureIndex) => {
     measure.staves.forEach((staff) => {
       staff.voices.forEach((voice) => {
@@ -133,33 +175,14 @@ function buildNotationEvents(
             durationSeconds: event.durationBeats * secondsPerBeat,
           }
 
-          if (event.notes.length === 0) {
-            playbackEvents.push({ ...baseEvent, pitches: [] })
-          }
-
-          event.notes.forEach((note) => {
-            const tieKey = `${staff.id}:${note.pitch}`
-            const previous = tiedEventsByPitch.get(tieKey)
-            let current: PlaybackEvent
-            if (note.tieFromPrevious && previous) {
-              previous.durationBeats += event.durationBeats
-              previous.durationSeconds += event.durationBeats * secondsPerBeat
-              current = previous
-            } else {
-              current = { ...baseEvent, pitches: [note.pitch] }
-              playbackEvents.push(current)
-            }
-
-            if (note.tieToNext) {
-              tiedEventsByPitch.set(tieKey, current)
-            } else {
-              tiedEventsByPitch.delete(tieKey)
-            }
-          })
+          events.push({ baseEvent, notes: event.notes, sequence })
+          sequence += 1
         })
       })
     })
   })
 
-  return playbackEvents
+  return events.sort((left, right) =>
+    left.baseEvent.startSeconds - right.baseEvent.startSeconds
+    || left.sequence - right.sequence)
 }

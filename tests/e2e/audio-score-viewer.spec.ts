@@ -109,7 +109,29 @@ test('generated audio score renders and plays with existing controls', async ({ 
   }
   await expect(page.getByLabel('Arrangement versions')).toHaveCount(0)
   await expect(page.getByLabel('Export score as PDF')).toBeVisible()
-  await expect(page.getByLabel('Original piano playback')).toBeVisible()
+  const sourceMenu = page.getByLabel('Playback source', { exact: true })
+  await expect(sourceMenu).toBeVisible()
+  await expect(sourceMenu).toContainText('Score')
+  await expect(page.getByRole('button', { name: 'Play' })).toHaveCount(1)
+
+  const playerGeometry = await page.locator('.player-controls').evaluate((player) => {
+    const playerBox = player.getBoundingClientRect()
+    const progressBox = player.querySelector('[aria-label="Playback progress"]')!.getBoundingClientRect()
+    const sourceBox = player.querySelector('[aria-label="Playback source"]')!.getBoundingClientRect()
+    return {
+      centerDifference: Math.abs(
+        sourceBox.left + sourceBox.width / 2 - (playerBox.left + playerBox.width / 2),
+      ),
+      sourceBelowProgress: sourceBox.top >= progressBox.bottom,
+      hasTransport: Boolean(player.querySelector('.transport')),
+    }
+  })
+  expect(playerGeometry).toEqual({
+    centerDifference: expect.any(Number),
+    sourceBelowProgress: true,
+    hasTransport: true,
+  })
+  expect(playerGeometry.centerDifference).toBeLessThanOrEqual(2)
 
   const tempo = page.getByLabel('Playback BPM')
   await tempo.fill('96')
@@ -120,7 +142,7 @@ test('generated audio score renders and plays with existing controls', async ({ 
   await play.click()
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
 
-  const progress = page.getByLabel('Score playback progress')
+  const progress = page.getByLabel('Playback progress')
   await expect.poll(async () => Number(await progress.inputValue()))
     .toBeGreaterThan(0)
 
@@ -128,6 +150,55 @@ test('generated audio score renders and plays with existing controls', async ({ 
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
   await page.getByRole('button', { name: 'Stop' }).click()
   await expect(progress).toHaveValue('0')
+
+  await sourceMenu.click()
+  await page.getByRole('menuitemradio', { name: 'Original Piano' }).click()
+  await expect(sourceMenu).toContainText('Original Piano')
+
+  const firstSystem = page.locator('.system-row').first()
+  const firstSystemBounds = await firstSystem.boundingBox()
+  expect(firstSystemBounds).not.toBeNull()
+  await firstSystem.click({
+    position: {
+      x: firstSystemBounds!.width * 0.125,
+      y: 120,
+    },
+  })
+  if (!suppliedViewerPath) {
+    const clickedReferenceSeconds = await page.evaluate(() =>
+      (Reflect.get(globalThis, '__referenceAudio') as { currentTime: number }).currentTime)
+    expect(clickedReferenceSeconds).toBeGreaterThanOrEqual(9.7)
+    expect(clickedReferenceSeconds).toBeLessThan(9.9)
+  }
+  await page.getByRole('button', { name: 'Stop' }).click()
+
+  await play.click()
+  await expect.poll(async () => Number(await progress.inputValue()))
+    .toBeGreaterThan(0)
+
+  await progress.fill('0.5')
+  await progress.dispatchEvent('change')
+  const referenceState = await page.evaluate(() => {
+    const audio = Reflect.get(globalThis, '__referenceAudio') as {
+      currentTime: number
+      playbackRate: number
+      preservesPitch: boolean
+    }
+    return {
+      currentTime: audio.currentTime,
+      playbackRate: audio.playbackRate,
+      preservesPitch: audio.preservesPitch,
+    }
+  })
+  if (suppliedViewerPath) {
+    expect(referenceState.currentTime).toBeGreaterThan(0)
+    expect(referenceState.playbackRate).toBeGreaterThan(0)
+  } else {
+    expect(referenceState.currentTime).toBeGreaterThanOrEqual(13.78)
+    expect(referenceState.currentTime).toBeLessThan(13.9)
+    expect(referenceState.playbackRate).toBe(0.8)
+  }
+  expect(referenceState.preservesPitch).toBe(true)
 
   if (process.env.AUDIO_SCORE_SCREENSHOT_PATH) {
     await page.locator('[data-workspace-scroll]').evaluate(element => element.scrollTo(0, 0))
@@ -167,7 +238,46 @@ async function installAudioMock(page: import('@playwright/test').Page): Promise<
       }
     }
 
+    class AudioMock {
+      playbackRate = 1
+      preservesPitch = false
+      preload = ''
+      private offsetSeconds = 0
+      private startedAt = 0
+      private playing = false
+
+      constructor(public src: string) {
+        Object.defineProperty(globalThis, '__referenceAudio', { value: this, configurable: true })
+      }
+
+      get currentTime(): number {
+        if (!this.playing) {
+          return this.offsetSeconds
+        }
+        return this.offsetSeconds + (performance.now() - this.startedAt) / 1000 * this.playbackRate
+      }
+
+      set currentTime(value: number) {
+        this.offsetSeconds = value
+        this.startedAt = performance.now()
+      }
+
+      async play(): Promise<void> {
+        this.startedAt = performance.now()
+        this.playing = true
+      }
+
+      pause(): void {
+        this.offsetSeconds = this.currentTime
+        this.playing = false
+      }
+
+      addEventListener(): void {}
+      removeEventListener(): void {}
+    }
+
     Object.defineProperty(globalThis, 'AudioContext', { value: AudioContextMock })
+    Object.defineProperty(globalThis, 'Audio', { value: AudioMock })
     Object.defineProperty(globalThis, 'fetch', {
       value: async () => ({
         ok: true,
@@ -202,7 +312,12 @@ function buildViewerFixture() {
       measures: [beamedMeasure, tiedMeasure, ...quarterMeasures],
       pedalIntervals: [{ startBeatOffset: 0.5, endBeatOffset: 3 }],
     },
-    pianoAudio: 'piano.wav',
+    referenceAudio: {
+      src: 'piano.wav',
+      scoreStartSeconds: 8.79,
+      sourceBpm: 120,
+      beatSeconds: Array.from({ length: 21 }, (_, index) => 8.79 + index * 0.5),
+    },
   }
 }
 

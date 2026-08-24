@@ -14,12 +14,14 @@ const mockTogglePlayback = vi.fn()
 const mockSeekPlayback = vi.fn()
 const mockChangePlaybackTempo = vi.fn()
 const mockStopPlayback = vi.fn()
+const mockSetPlaybackMode = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockUsePianoPlayback.mockReturnValue({
     status: ref('idle'),
     errorMessage: ref(null),
+    mode: ref('score'),
     position: ref({
       elapsedSeconds: 0,
       totalDurationSeconds: 0,
@@ -30,6 +32,7 @@ beforeEach(() => {
     togglePlayback: mockTogglePlayback,
     seekPlayback: mockSeekPlayback,
     changePlaybackTempo: mockChangePlaybackTempo,
+    setPlaybackMode: mockSetPlaybackMode,
     stopPlayback: mockStopPlayback,
   })
 })
@@ -90,18 +93,25 @@ test('test_ArrangementGrid_when_version_switcher_is_hidden_then_keeps_playback_c
   expect(versionSwitcher.exists()).toBe(false)
   expect(wrapper.find('button.play').exists()).toBe(true)
   expect(wrapper.find('button.stop').exists()).toBe(true)
-  expect(wrapper.find('input[aria-label="Score playback progress"]').exists()).toBe(true)
+  expect(wrapper.find('input[aria-label="Playback progress"]').exists()).toBe(true)
   expect(wrapper.find('input[aria-label="Playback BPM"]').exists()).toBe(true)
+  expect(wrapper.get('.player-controls [aria-label="Playback source"]').text()).toBe('Score')
+  expect(wrapper.find('details[aria-label="Playback source menu"]').exists()).toBe(false)
 })
 
-test('test_ArrangementGrid_when_reference_audio_is_available_then_renders_original_piano_player', async () => {
-  // Arrange & Act
+test('test_ArrangementGrid_when_reference_audio_is_available_then_selects_source_below_transport', async () => {
+  // Arrange
   const wrapper = await mountSuspended(ArrangementGrid, {
     props: {
       active: true,
       arrangements: buildArrangementSet(),
       chart: buildConfirmedChart(),
-      referenceAudioSrc: 'piano.wav',
+      referenceAudio: {
+        src: 'piano.wav',
+        scoreStartSeconds: 8.79,
+        sourceBpm: 71,
+        beatSeconds: [8.79, 9.61, 10.48],
+      },
     },
     global: {
       stubs: {
@@ -110,9 +120,21 @@ test('test_ArrangementGrid_when_reference_audio_is_available_then_renders_origin
     },
   })
 
+  // Act
+  await wrapper.get('[aria-label="Original Piano"]').trigger('click')
+
   // Assert
-  expect(wrapper.get('audio[aria-label="Original piano playback"]').attributes('src'))
-    .toBe('piano.wav')
+  expect(wrapper.findAll('button.play')).toHaveLength(1)
+  expect(wrapper.find('audio[controls]').exists()).toBe(false)
+  expect(wrapper.get('.player-controls [aria-label="Playback source"]').text()).toContain('Score')
+  expect(wrapper.find('details[aria-label="Playback source menu"]').exists()).toBe(true)
+  expect(wrapper.get('.player-controls').find('button.play').exists()).toBe(true)
+  expect(wrapper.get('.player-controls').find('input[aria-label="Playback progress"]').exists()).toBe(true)
+  expect(mockSetPlaybackMode).toHaveBeenCalledWith(
+    'reference',
+    expect.objectContaining({ level: 'rich' }),
+    72,
+  )
 })
 
 test('test_ArrangementGrid_when_tempo_changes_then_forwards_selected_version_and_bpm', async () => {
