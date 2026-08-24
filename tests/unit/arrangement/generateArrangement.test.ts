@@ -14,6 +14,20 @@ describe('generateArrangement', () => {
     expect(result.versions.map((version) => version.level)).toEqual(['easy', 'rich'])
   })
 
+  test('test_generateArrangement_when_confirmed_chart_then_builds_treble_and_bass_staff_voices', () => {
+    // Arrange
+    const chart = buildConfirmedChart('spacious-ballad')
+
+    // Act
+    const result = generateArrangement(chart)
+
+    // Assert
+    expect(result.versions[0]?.measures[0]?.staves).toEqual([
+      expect.objectContaining({ id: 'treble', clef: 'treble', voices: [expect.any(Object)] }),
+      expect.objectContaining({ id: 'bass', clef: 'bass', voices: [expect.any(Object)] }),
+    ])
+  })
+
   test('test_generateArrangement_when_mood_changes_then_returns_expected_rich_rhythms', () => {
     // Arrange
     const moods: Mood[] = ['spacious-ballad', 'flowing-narrative', 'urban-groove']
@@ -22,9 +36,9 @@ describe('generateArrangement', () => {
     const rhythms = moods.map((mood) => {
       const result = generateArrangement(buildConfirmedChart(mood))
       const rich = result.versions.find((version) => version.level === 'rich')
-      return rich?.measures[0].rightHand.map((event) => ({
+      return getStaffEvents(rich!.measures[0]!, 'treble').map((event) => ({
         durationBeats: event.durationBeats,
-        pitchCount: event.pitches.length,
+        pitchCount: event.notes.length,
       }))
     })
 
@@ -74,7 +88,7 @@ describe('generateArrangement', () => {
     expect(result.versions[0].measures[0].intensity).toBe('soft')
   })
 
-  test('test_generateArrangement_when_score_is_generated_then_each_hand_fills_four_beats', () => {
+  test('test_generateArrangement_when_score_is_generated_then_each_voice_fills_four_beats', () => {
     // Arrange
     const chart = buildConfirmedChart('urban-groove')
 
@@ -84,8 +98,11 @@ describe('generateArrangement', () => {
     // Assert
     for (const version of result.versions) {
       for (const measure of version.measures) {
-        expect(sumDurations(measure.leftHand)).toBe(4)
-        expect(sumDurations(measure.rightHand)).toBe(4)
+        for (const staff of measure.staves) {
+          for (const voice of staff.voices) {
+            expect(sumDurations(voice.events)).toBe(4)
+          }
+        }
       }
     }
   })
@@ -103,7 +120,9 @@ describe('generateArrangement', () => {
     const easyMeasure = result.versions[0].measures[0]
 
     // Assert
-    expect(easyMeasure.rightHand.filter((event) => event.chordSymbol).map((event) => event.chordSymbol)).toEqual(['C', 'G/B'])
+    expect(getStaffEvents(easyMeasure, 'treble')
+      .filter(event => event.chordSymbol)
+      .map(event => event.chordSymbol)).toEqual(['C', 'G/B'])
   })
 
   test('test_generateArrangement_when_chords_have_lyrics_then_positions_each_segment_at_chord_start_beat', () => {
@@ -223,4 +242,15 @@ function buildChordPlacement(
 
 function sumDurations(events: Array<{ durationBeats: number }>): number {
   return events.reduce((total, event) => total + event.durationBeats, 0)
+}
+
+function getStaffEvents(
+  measure: ReturnType<typeof generateArrangement>['versions'][number]['measures'][number],
+  clef: 'treble' | 'bass',
+) {
+  const staff = measure.staves.find(candidate => candidate.clef === clef)
+  if (!staff) {
+    throw new Error(`Missing ${clef} staff`)
+  }
+  return staff.voices[0]!.events
 }

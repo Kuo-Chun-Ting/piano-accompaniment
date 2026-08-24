@@ -9,13 +9,26 @@ export type ScoreKeySignature =
 export type ScoreEvent = {
   startBeat: number
   durationBeats: number
-  pitches: string[]
-  fingers: number[]
-  tieToNext: boolean
-  tieFromPrevious?: boolean
-  tieToNextPitches?: string[]
-  tieFromPreviousPitches?: string[]
+  notes: ScoreNote[]
   chordSymbol?: string
+}
+
+export type ScoreNote = {
+  pitch: string
+  finger?: number
+  tieFromPrevious?: boolean
+  tieToNext?: boolean
+}
+
+export type ScoreVoice = {
+  id: string
+  events: ScoreEvent[]
+}
+
+export type ScoreStaff = {
+  id: 'treble' | 'bass'
+  clef: 'treble' | 'bass'
+  voices: ScoreVoice[]
 }
 
 export type ScoreLyricCue = {
@@ -30,8 +43,7 @@ export type ScoreMeasure = {
   chordSymbols: string[]
   lyrics: ScoreLyricCue[]
   intensity: MeasureIntensity
-  rightHand: ScoreEvent[]
-  leftHand: ScoreEvent[]
+  staves: ScoreStaff[]
 }
 
 export type ScorePedalInterval = {
@@ -39,19 +51,11 @@ export type ScorePedalInterval = {
   endBeatOffset: number
 }
 
-export type ScorePlaybackNote = {
-  pitch: string
-  startBeatOffset: number
-  durationBeats: number
-  velocity: number
-}
-
 export type ScoreVersion = {
   level: ArrangementLevelName
   measures: ScoreMeasure[]
   keySignature?: ScoreKeySignature
   pedalIntervals?: ScorePedalInterval[]
-  playbackNotes?: ScorePlaybackNote[]
 }
 
 export type ArrangementSet = {

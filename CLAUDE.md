@@ -29,3 +29,5 @@
 
 1. 預設執行所有不會呼叫真實 API 的測試。
 2. 只有修改 prompt、AI schema、model 選擇或真實 API 串接時，才執行會呼叫真實 AI API 的 `@live` E2E test。
+3. 修改音訊轉譜、五線譜渲染或 Player 後，使用本機權限執行 `npm run audio:score:verify`；安靜與楓都通過才算完成。此指令直接開啟產物，不啟動網站、不使用 port，也不需停止 `npm run dev`。
+4. 執行 `npm run test:e2e` 或 `npm run test:e2e:live` 時，未設定 `PLAYWRIGHT_BASE_URL` 則由 Playwright 自動在 `3200` 啟動測試網站；不要改用 `npm run dev` 的 `3000`。

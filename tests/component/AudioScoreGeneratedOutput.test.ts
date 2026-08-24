@@ -18,6 +18,11 @@ beforeAll(() => {
     configurable: true,
     get: () => 1200,
   })
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callback(0)
+    return 1
+  })
+  vi.stubGlobal('cancelAnimationFrame', () => {})
 })
 
 for (const name of ['安靜', '楓']) {
@@ -26,6 +31,12 @@ for (const name of ['安靜', '楓']) {
   test.skipIf(!existsSync(scorePath))(`test_AudioScoreGeneratedOutput_when_${name}_is_generated_then_renders_every_system`, async () => {
     const score = JSON.parse(readFileSync(scorePath, 'utf8'))
     const systems = buildScoreSystems(score.version.measures)
+
+    for (const measure of score.version.measures) {
+      for (const staff of measure.staves) {
+        expect(staff.voices).toHaveLength(1)
+      }
+    }
 
     for (const system of systems) {
       const wrapper = mount(PianoScoreSystem, {

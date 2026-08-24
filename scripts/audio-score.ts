@@ -113,11 +113,11 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
     title: options.title,
     tempo: structureFile.bpm,
     version,
+    pianoAudio: 'piano.wav',
   })
-  const renderedNoteEvents = version.measures.flatMap(measure => [
-    ...measure.rightHand,
-    ...measure.leftHand,
-  ]).filter(event => event.pitches.length > 0)
+  const renderedNoteEvents = version.measures.flatMap(measure => measure.staves.flatMap(staff =>
+    staff.voices.flatMap(voice => voice.events)))
+    .filter(event => event.notes.length > 0)
 
   if (renderedNoteEvents.length === 0) {
     throw new Error('Transcription produced no playable score events')

@@ -94,6 +94,27 @@ test('test_ArrangementGrid_when_version_switcher_is_hidden_then_keeps_playback_c
   expect(wrapper.find('input[aria-label="Playback BPM"]').exists()).toBe(true)
 })
 
+test('test_ArrangementGrid_when_reference_audio_is_available_then_renders_original_piano_player', async () => {
+  // Arrange & Act
+  const wrapper = await mountSuspended(ArrangementGrid, {
+    props: {
+      active: true,
+      arrangements: buildArrangementSet(),
+      chart: buildConfirmedChart(),
+      referenceAudioSrc: 'piano.wav',
+    },
+    global: {
+      stubs: {
+        PianoScore: { template: '<div data-test="piano-score" />' },
+      },
+    },
+  })
+
+  // Assert
+  expect(wrapper.get('audio[aria-label="Original piano playback"]').attributes('src'))
+    .toBe('piano.wav')
+})
+
 test('test_ArrangementGrid_when_tempo_changes_then_forwards_selected_version_and_bpm', async () => {
   // Arrange
   const wrapper = await mountArrangementGrid()
@@ -165,8 +186,18 @@ function buildScoreMeasure(index: number): ScoreMeasure {
     chordSymbols: ['C'],
     lyrics: [],
     intensity: 'medium',
-    rightHand: [],
-    leftHand: [],
+    staves: [
+      {
+        id: 'treble',
+        clef: 'treble',
+        voices: [{ id: 'treble-1', events: [{ startBeat: 1, durationBeats: 4, notes: [] }] }],
+      },
+      {
+        id: 'bass',
+        clef: 'bass',
+        voices: [{ id: 'bass-1', events: [{ startBeat: 1, durationBeats: 4, notes: [] }] }],
+      },
+    ],
   }
 }
 

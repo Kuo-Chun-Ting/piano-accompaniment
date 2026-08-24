@@ -51,6 +51,9 @@ test('generated audio score renders and plays with existing controls', async ({ 
   await expect(page.getByRole('heading', { name: expectedTitle })).toBeVisible()
   await expect(page.getByLabel('Piano score')).toBeVisible()
   await expect(page.locator('.score-system svg').first()).toBeVisible()
+  await expect.poll(async () => page.locator('.score-system').evaluateAll(systems =>
+    systems.every(system => (system as HTMLElement).dataset.layoutReady === 'true')))
+    .toBe(true)
   await expect(page.locator('.vf-beam').first()).toBeVisible()
   await expect(page.locator('.vf-stavetie').first()).toBeVisible()
   if (!suppliedViewerPath) {
@@ -64,11 +67,49 @@ test('generated audio score renders and plays with existing controls', async ({ 
 
     return {
       verticalOverflow: stemBoxes.filter(box => box.y < 0 || box.y + box.height > height).length,
+      oversizedStems: stemBoxes.filter(box => box.height > 120).length,
+      maxStemHeight: Math.max(0, ...stemBoxes.map(box => box.height)),
     }
   }))
-  expect(notationGeometry.every(system => system.verticalOverflow === 0)).toBe(true)
+  expect(notationGeometry).toEqual(notationGeometry.map(system => ({
+    ...system,
+    verticalOverflow: 0,
+    oversizedStems: 0,
+  })))
+
+  const contentLayers = await page.locator('.score-system svg').evaluateAll(svgs => svgs.map((svg) => {
+    const getBox = (selector: string) => {
+      const elements = [...svg.querySelectorAll<SVGGraphicsElement>(selector)]
+      if (elements.length === 0) {
+        return null
+      }
+      const boxes = elements.map(element => element.getBBox())
+      const top = Math.min(...boxes.map(box => box.y))
+      const bottom = Math.max(...boxes.map(box => box.y + box.height))
+      return { top, bottom }
+    }
+    const notation = getBox('.vf-score-notation')
+    const pedal = getBox('.vf-pedal-marking')
+    const lyrics = getBox('.vf-score-lyrics')
+
+    return {
+      pedalGap: notation && pedal ? pedal.top - notation.bottom : null,
+      lyricGap: lyrics ? lyrics.top - (pedal?.bottom ?? notation?.bottom ?? lyrics.top) : null,
+    }
+  }))
+  expect(contentLayers.some(system => system.pedalGap !== null)).toBe(true)
+  expect(contentLayers.some(system => system.lyricGap !== null)).toBe(true)
+  for (const system of contentLayers) {
+    if (system.pedalGap !== null) {
+      expect(system.pedalGap).toBeGreaterThanOrEqual(8)
+    }
+    if (system.lyricGap !== null) {
+      expect(system.lyricGap).toBeGreaterThanOrEqual(8)
+    }
+  }
   await expect(page.getByLabel('Arrangement versions')).toHaveCount(0)
   await expect(page.getByLabel('Export score as PDF')).toBeVisible()
+  await expect(page.getByLabel('Original piano playback')).toBeVisible()
 
   const tempo = page.getByLabel('Playback BPM')
   await tempo.fill('96')
@@ -140,12 +181,18 @@ function buildViewerFixture() {
   const beamedMeasure = buildMeasure(1, Array.from({ length: 8 }, (_, index) =>
     buildEvent(1 + index * 0.5, 0.5, [`${['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C'][index]}${index === 7 ? 5 : 4}`])))
   const tiedMeasure = buildMeasure(2, [
-    { ...buildEvent(1, 2, ['C4']), tieToNext: true },
-    { ...buildEvent(3, 2, ['C4']), tieFromPrevious: true },
+    buildEvent(1, 2, [{ pitch: 'C4', tieToNext: true }]),
+    buildEvent(3, 2, [{ pitch: 'C4', tieFromPrevious: true }]),
   ])
-  const quarterMeasures = Array.from({ length: 3 }, (_, index) =>
-    buildMeasure(index + 3, Array.from({ length: 4 }, (__, eventIndex) =>
-      buildEvent(eventIndex + 1, 1, ['E4']))))
+  const quarterMeasures = Array.from({ length: 3 }, (_, index) => {
+    const melody = Array.from({ length: 4 }, (__, eventIndex) =>
+      buildEvent(eventIndex + 1, 1, ['E4']))
+    return buildMeasure(
+      index + 3,
+      melody,
+      index === 0 ? [melody, [buildEvent(1, 4, ['G5'])]] : [melody],
+    )
+  })
 
   return {
     title: expectedTitle,
@@ -153,30 +200,55 @@ function buildViewerFixture() {
     version: {
       level: 'rich' as const,
       measures: [beamedMeasure, tiedMeasure, ...quarterMeasures],
+      pedalIntervals: [{ startBeatOffset: 0.5, endBeatOffset: 3 }],
     },
+    pianoAudio: 'piano.wav',
   }
 }
 
-function buildMeasure(index: number, rightHand: ScoreEvent[]) {
+function buildMeasure(
+  index: number,
+  trebleEvents: ScoreEvent[],
+  trebleVoices: ScoreEvent[][] = [trebleEvents],
+) {
   return {
     sectionId: 'fixture',
     sectionLabel: 'Fixture',
     index,
     chordSymbols: [],
-    lyrics: [],
+    lyrics: index === 1
+      ? [{ startBeat: 1, text: '只剩下鋼琴陪我彈了一天' }]
+      : [],
     intensity: 'medium' as const,
-    rightHand,
-    leftHand: [buildEvent(1, 4, [])],
+    staves: [
+      {
+        id: 'treble' as const,
+        clef: 'treble' as const,
+        voices: trebleVoices.map((events, voiceIndex) => ({
+          id: `treble-${voiceIndex + 1}`,
+          events,
+        })),
+      },
+      {
+        id: 'bass' as const,
+        clef: 'bass' as const,
+        voices: [{ id: 'bass-1', events: [buildEvent(1, 4, [])] }],
+      },
+    ],
   }
 }
 
-function buildEvent(startBeat: number, durationBeats: number, pitches: string[]): ScoreEvent {
+function buildEvent(
+  startBeat: number,
+  durationBeats: number,
+  pitches: string[] | ScoreEvent['notes'],
+): ScoreEvent {
   return {
     startBeat,
     durationBeats,
-    pitches,
-    fingers: [],
-    tieToNext: false,
+    notes: typeof pitches[0] === 'string'
+      ? (pitches as string[]).map(pitch => ({ pitch }))
+      : pitches as ScoreEvent['notes'],
   }
 }
 

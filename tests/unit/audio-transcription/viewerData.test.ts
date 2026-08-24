@@ -24,17 +24,27 @@ describe('viewerData', () => {
     expect(parse).toThrow('Viewer score data is invalid')
   })
 
-  test('test_parseViewerData_when_measure_is_missing_hand_events_then_throws_clear_error', () => {
+  test('test_parseViewerData_when_measure_is_missing_staff_then_throws_clear_error', () => {
     // Arrange
     const payload = buildPayload()
-    const { leftHand: _leftHand, ...incompleteMeasure } = payload.version.measures[0]
-    payload.version.measures = [incompleteMeasure as never]
+    payload.version.measures[0]!.staves = payload.version.measures[0]!.staves.slice(0, 1)
 
     // Act
     const parse = () => parseViewerData(payload)
 
     // Assert
     expect(parse).toThrow('Viewer score data is invalid')
+  })
+
+  test('test_parseViewerData_when_piano_audio_is_provided_then_preserves_second_playback_source', () => {
+    // Arrange
+    const payload = { ...buildPayload(), pianoAudio: 'piano.wav' }
+
+    // Act
+    const result = parseViewerData(payload)
+
+    // Assert
+    expect(result.pianoAudio).toBe('piano.wav')
   })
 
   test('test_parseViewerData_when_score_contains_pedal_intervals_then_preserves_them', () => {
@@ -90,8 +100,24 @@ function buildPayload() {
         chordSymbols: [],
         lyrics: [],
         intensity: 'medium' as const,
-        rightHand: [buildEvent(1, ['C4']), buildEvent(3, [])],
-        leftHand: [buildEvent(1, []), buildEvent(3, [])],
+        staves: [
+          {
+            id: 'treble' as const,
+            clef: 'treble' as const,
+            voices: [{
+              id: 'treble-1',
+              events: [buildEvent(1, ['C4']), buildEvent(3, [])],
+            }],
+          },
+          {
+            id: 'bass' as const,
+            clef: 'bass' as const,
+            voices: [{
+              id: 'bass-1',
+              events: [buildEvent(1, []), buildEvent(3, [])],
+            }],
+          },
+        ],
       }],
     },
   }
@@ -101,8 +127,6 @@ function buildEvent(startBeat: number, pitches: string[]) {
   return {
     startBeat,
     durationBeats: 2,
-    pitches,
-    fingers: [],
-    tieToNext: false,
+    notes: pitches.map(pitch => ({ pitch })),
   }
 }

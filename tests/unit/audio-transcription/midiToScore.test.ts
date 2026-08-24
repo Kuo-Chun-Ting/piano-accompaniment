@@ -26,44 +26,106 @@ describe('midiToScore', () => {
     const result = convertTranscriptionToScore(input)
 
     // Assert
-    expect(result.measures[0]?.rightHand[0]).toMatchObject({
+    expect(getVoiceEvents(result.measures[0], 'bass')[0]).toMatchObject({
       startBeat: 1,
       durationBeats: 0.5,
-      pitches: ['C4'],
+      notes: [{ pitch: 'C4' }],
     })
   })
 
   test('test_convertTranscriptionToScore_when_release_leaves_eighth_note_gap_then_preserves_rest', () => {
     // Arrange
     const input = buildInput([
-      { midi: 60, startSeconds: 0, endSeconds: 0.24, velocity: 80 },
-      { midi: 62, startSeconds: 0.5, endSeconds: 0.74, velocity: 80 },
+      { midi: 67, startSeconds: 0, endSeconds: 0.24, velocity: 80 },
+      { midi: 69, startSeconds: 0.5, endSeconds: 0.74, velocity: 80 },
     ])
 
     // Act
     const result = convertTranscriptionToScore(input)
 
     // Assert
-    expect(result.measures[0]?.rightHand.slice(0, 3)).toEqual([
-      expect.objectContaining({ startBeat: 1, durationBeats: 0.5, pitches: ['C4'] }),
-      expect.objectContaining({ startBeat: 1.5, durationBeats: 0.5, pitches: [] }),
-      expect.objectContaining({ startBeat: 2, durationBeats: 0.5, pitches: ['D4'] }),
+    expect(getVoiceEvents(result.measures[0], 'treble').slice(0, 3)).toEqual([
+      expect.objectContaining({ startBeat: 1, durationBeats: 0.5, notes: [{ pitch: 'G4' }] }),
+      expect.objectContaining({ startBeat: 1.5, durationBeats: 0.5, notes: [] }),
+      expect.objectContaining({ startBeat: 2, durationBeats: 0.5, notes: [{ pitch: 'A4' }] }),
     ])
   })
 
   test('test_convertTranscriptionToScore_when_notes_start_together_then_builds_one_chord_event', () => {
     // Arrange
     const input = buildInput([
-      { midi: 60, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
-      { midi: 64, startSeconds: 0, endSeconds: 0.5, velocity: 76 },
-      { midi: 67, startSeconds: 0, endSeconds: 0.5, velocity: 72 },
+      { midi: 67, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
+      { midi: 72, startSeconds: 0, endSeconds: 0.5, velocity: 76 },
+      { midi: 76, startSeconds: 0, endSeconds: 0.5, velocity: 72 },
     ])
 
     // Act
     const result = convertTranscriptionToScore(input)
 
     // Assert
-    expect(result.measures[0]?.rightHand[0]?.pitches).toEqual(['C4', 'E4', 'G4'])
+    expect(getVoiceEvents(result.measures[0], 'treble')[0]?.notes.map(note => note.pitch))
+      .toEqual(['G4', 'C5', 'E5'])
+  })
+
+  test('test_convertTranscriptionToScore_when_chord_notes_share_duration_then_builds_one_staff_voice_event', () => {
+    // Arrange
+    const input = buildInput([
+      { midi: 67, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
+      { midi: 72, startSeconds: 0, endSeconds: 0.5, velocity: 76 },
+      { midi: 76, startSeconds: 0, endSeconds: 0.5, velocity: 72 },
+    ])
+
+    // Act
+    const result = convertTranscriptionToScore(input)
+
+    // Assert
+    const treble = result.measures[0]?.staves.find(staff => staff.clef === 'treble')
+    expect(treble?.voices).toHaveLength(1)
+    expect(treble?.voices[0]?.events[0]).toMatchObject({
+      startBeat: 1,
+      durationBeats: 1,
+      notes: [{ pitch: 'G4' }, { pitch: 'C5' }, { pitch: 'E5' }],
+    })
+  })
+
+  test('test_convertTranscriptionToScore_when_simultaneous_notes_have_different_durations_then_uses_partial_ties_in_one_voice', () => {
+    // Arrange
+    const input = buildInput([
+      { midi: 67, startSeconds: 0, endSeconds: 2, velocity: 80 },
+      { midi: 72, startSeconds: 0, endSeconds: 1, velocity: 76 },
+      { midi: 76, startSeconds: 0, endSeconds: 0.5, velocity: 72 },
+    ])
+
+    // Act
+    const result = convertTranscriptionToScore(input)
+
+    // Assert
+    const treble = result.measures[0]?.staves.find(staff => staff.clef === 'treble')
+    expect(treble?.voices).toHaveLength(1)
+    expect(treble?.voices[0]?.events).toEqual([
+      expect.objectContaining({
+        startBeat: 1,
+        durationBeats: 1,
+        notes: [
+          { pitch: 'G4', tieToNext: true },
+          { pitch: 'C5', tieToNext: true },
+          { pitch: 'E5' },
+        ],
+      }),
+      expect.objectContaining({
+        startBeat: 2,
+        durationBeats: 1,
+        notes: [
+          { pitch: 'G4', tieFromPrevious: true, tieToNext: true },
+          { pitch: 'C5', tieFromPrevious: true },
+        ],
+      }),
+      expect.objectContaining({
+        startBeat: 3,
+        durationBeats: 2,
+        notes: [{ pitch: 'G4', tieFromPrevious: true }],
+      }),
+    ])
   })
 
   test('test_convertTranscriptionToScore_when_sustained_note_overlaps_new_onset_then_marks_partial_ties', () => {
@@ -78,30 +140,30 @@ describe('midiToScore', () => {
     const result = convertTranscriptionToScore(input)
 
     // Assert
-    expect(result.measures[0]?.rightHand.filter(event => event.pitches.length > 0)).toEqual([
+    expect(getVoiceEvents(result.measures[0], 'treble').filter(event => event.notes.length > 0)).toEqual([
       expect.objectContaining({
         startBeat: 1,
         durationBeats: 1,
-        pitches: ['C6'],
-        tieToNextPitches: ['C6'],
+        notes: [{ pitch: 'C6', tieToNext: true }],
       }),
       expect.objectContaining({
         startBeat: 2,
         durationBeats: 1,
-        pitches: ['E5', 'B5', 'C6'],
-        tieFromPreviousPitches: ['C6'],
-        tieToNextPitches: ['C6'],
+        notes: [
+          { pitch: 'E5' },
+          { pitch: 'B5' },
+          { pitch: 'C6', tieFromPrevious: true, tieToNext: true },
+        ],
       }),
       expect.objectContaining({
         startBeat: 3,
         durationBeats: 1,
-        pitches: ['C6'],
-        tieFromPreviousPitches: ['C6'],
+        notes: [{ pitch: 'C6', tieFromPrevious: true }],
       }),
     ])
   })
 
-  test('test_convertTranscriptionToScore_when_notes_are_above_middle_c_then_keeps_them_in_right_hand', () => {
+  test('test_convertTranscriptionToScore_when_notes_span_middle_c_then_separates_staves', () => {
     // Arrange
     const input = buildInput([
       { midi: 60, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
@@ -112,36 +174,15 @@ describe('midiToScore', () => {
     const result = convertTranscriptionToScore(input)
 
     // Assert
-    expect(result.measures[0]?.leftHand[0]?.pitches).toEqual([])
-    expect(result.measures[0]?.rightHand[0]?.pitches).toEqual(['C4', 'C6'])
+    expect(getSoundingPitches(result.measures[0], 'bass')).toEqual(['C4'])
+    expect(getSoundingPitches(result.measures[0], 'treble')).toEqual(['C6'])
   })
 
-  test('test_convertTranscriptionToScore_when_note_has_precise_timing_then_preserves_playback_note', () => {
-    // Arrange
-    const input = {
-      ...buildInput([
-        { midi: 60, startSeconds: 1.25, endSeconds: 2.1, velocity: 83 },
-      ], 4, 1),
-      bpm: 60,
-    }
-
-    // Act
-    const result = convertTranscriptionToScore(input)
-
-    // Assert
-    expect(result.playbackNotes).toEqual([{
-      pitch: 'C4',
-      startBeatOffset: 0.25,
-      durationBeats: expect.closeTo(0.85),
-      velocity: 83,
-    }])
-  })
-
-  test('test_convertTranscriptionToScore_when_notes_cross_middle_c_then_keeps_register_boundary', () => {
+  test('test_convertTranscriptionToScore_when_notes_cross_middle_c_then_keeps_each_staff_playable', () => {
     // Arrange
     const input = buildInput([
       { midi: 41, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
-      { midi: 57, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
+      { midi: 53, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
       { midi: 72, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
     ])
 
@@ -149,11 +190,11 @@ describe('midiToScore', () => {
     const result = convertTranscriptionToScore(input)
 
     // Assert
-    expect(result.measures[0]?.leftHand[0]?.pitches).toEqual(['F2', 'A3'])
-    expect(result.measures[0]?.rightHand[0]?.pitches).toEqual(['C5'])
+    expect(getSoundingPitches(result.measures[0], 'bass')).toEqual(['F2', 'F3'])
+    expect(getSoundingPitches(result.measures[0], 'treble')).toEqual(['C5'])
   })
 
-  test('test_convertTranscriptionToScore_when_low_notes_exceed_hand_span_then_keeps_them_in_left_hand', () => {
+  test('test_convertTranscriptionToScore_when_low_notes_exceed_hand_span_then_splits_them_between_staves', () => {
     // Arrange
     const input = buildInput([
       { midi: 41, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
@@ -164,8 +205,43 @@ describe('midiToScore', () => {
     const result = convertTranscriptionToScore(input)
 
     // Assert
-    expect(result.measures[0]?.leftHand[0]?.pitches).toEqual(['F2', 'A3'])
-    expect(result.measures[0]?.rightHand[0]?.pitches).toEqual([])
+    expect(getSoundingPitches(result.measures[0], 'bass')).toEqual(['F2'])
+    expect(getSoundingPitches(result.measures[0], 'treble')).toEqual(['A3'])
+  })
+
+  test('test_convertTranscriptionToScore_when_sustained_bass_overlaps_upper_notes_then_keeps_both_staff_spans_playable', () => {
+    // Arrange
+    const input = buildInput([
+      { midi: 41, startSeconds: 0, endSeconds: 1.5, velocity: 80 },
+      { midi: 57, startSeconds: 0.5, endSeconds: 1, velocity: 80 },
+      { midi: 60, startSeconds: 0.5, endSeconds: 1, velocity: 80 },
+    ])
+
+    // Act
+    const result = convertTranscriptionToScore(input)
+
+    // Assert
+    expect(getVoiceEvents(result.measures[0], 'bass')[1]?.notes.map(note => note.pitch))
+      .toEqual(['F2'])
+    expect(getVoiceEvents(result.measures[0], 'treble')[1]?.notes.map(note => note.pitch))
+      .toEqual(['A3', 'C4'])
+  })
+
+  test('test_convertTranscriptionToScore_when_later_bass_overlaps_sustained_upper_note_then_reassigns_the_upper_note', () => {
+    // Arrange
+    const input = buildInput([
+      { midi: 58, startSeconds: 0, endSeconds: 1.5, velocity: 80 },
+      { midi: 43, startSeconds: 0.5, endSeconds: 1, velocity: 80 },
+    ])
+
+    // Act
+    const result = convertTranscriptionToScore(input)
+
+    // Assert
+    expect(getVoiceEvents(result.measures[0], 'bass')[1]?.notes.map(note => note.pitch))
+      .toEqual(['G2'])
+    expect(getVoiceEvents(result.measures[0], 'treble')[1]?.notes.map(note => note.pitch))
+      .toEqual(['A#3'])
   })
 
   test('test_convertTranscriptionToScore_when_notes_span_middle_c_then_splits_hands', () => {
@@ -179,14 +255,14 @@ describe('midiToScore', () => {
     const result = convertTranscriptionToScore(input)
 
     // Assert
-    expect(result.measures[0]?.leftHand[0]?.pitches).toEqual(['C3'])
-    expect(result.measures[0]?.rightHand[0]?.pitches).toEqual(['C5'])
+    expect(getSoundingPitches(result.measures[0], 'bass')).toEqual(['C3'])
+    expect(getSoundingPitches(result.measures[0], 'treble')).toEqual(['C5'])
   })
 
   test('test_convertTranscriptionToScore_when_note_crosses_measure_then_marks_notation_segments_tied', () => {
     // Arrange
     const input = buildInput([
-      { midi: 60, startSeconds: 1.75, endSeconds: 2.25, velocity: 80 },
+      { midi: 72, startSeconds: 1.75, endSeconds: 2.25, velocity: 80 },
     ], 2.5)
 
     // Act
@@ -194,21 +270,19 @@ describe('midiToScore', () => {
 
     // Assert
     expect(result.measures).toHaveLength(2)
-    expect(result.measures[0]?.rightHand.at(-1)).toMatchObject({
+    expect(getVoiceEvents(result.measures[0], 'treble').at(-1)).toMatchObject({
       startBeat: 4.5,
       durationBeats: 0.5,
-      pitches: ['C4'],
-      tieToNext: true,
+      notes: [{ pitch: 'C5', tieToNext: true }],
     })
-    expect(result.measures[1]?.rightHand[0]).toMatchObject({
+    expect(getVoiceEvents(result.measures[1], 'treble')[0]).toMatchObject({
       startBeat: 1,
       durationBeats: 0.5,
-      pitches: ['C4'],
-      tieFromPrevious: true,
+      notes: [{ pitch: 'C5', tieFromPrevious: true }],
     })
   })
 
-  test('test_convertTranscriptionToScore_when_score_is_built_then_each_hand_fills_every_measure', () => {
+  test('test_convertTranscriptionToScore_when_score_is_built_then_each_voice_fills_every_measure', () => {
     // Arrange
     const input = buildInput([
       { midi: 48, startSeconds: 0, endSeconds: 0.5, velocity: 80 },
@@ -221,8 +295,11 @@ describe('midiToScore', () => {
 
     // Assert
     for (const measure of result.measures) {
-      expect(sumDurations(measure.leftHand)).toBe(4)
-      expect(sumDurations(measure.rightHand)).toBe(4)
+      for (const staff of measure.staves) {
+        for (const voice of staff.voices) {
+          expect(sumDurations(voice.events)).toBe(4)
+        }
+      }
     }
   })
 
@@ -236,9 +313,9 @@ describe('midiToScore', () => {
     const result = convertTranscriptionToScore(input)
 
     // Assert
-    expect(result.measures[0]?.rightHand[0]).toMatchObject({
+    expect(getVoiceEvents(result.measures[0], 'bass')[0]).toMatchObject({
       startBeat: 1,
-      pitches: ['C4'],
+      notes: [{ pitch: 'C4' }],
     })
   })
 
@@ -257,7 +334,7 @@ describe('midiToScore', () => {
 
     // Assert
     expect(result.measures).toHaveLength(3)
-    expect(result.measures[2]?.rightHand.some(event => event.pitches.includes('E4'))).toBe(true)
+    expect(getSoundingPitches(result.measures[2], 'treble')).toContain('E4')
   })
 
   test('test_convertTranscriptionToScore_when_pedal_events_are_provided_then_aligns_interval_to_score_beats', () => {
@@ -297,10 +374,8 @@ describe('midiToScore', () => {
     const result = convertTranscriptionToScore(input)
 
     // Assert
-    const pitches = result.measures.flatMap(measure => [
-      ...measure.leftHand.flatMap(event => event.pitches),
-      ...measure.rightHand.flatMap(event => event.pitches),
-    ])
+    const pitches = result.measures.flatMap(measure => measure.staves.flatMap(staff =>
+      staff.voices.flatMap(voice => voice.events.flatMap(event => event.notes.map(note => note.pitch)))))
     expect(result.keySignature).toBe('Bb')
     expect(pitches).toContain('Bb3')
     expect(pitches).toContain('Eb4')
@@ -392,4 +467,30 @@ function buildInput(
 
 function sumDurations(events: Array<{ durationBeats: number }>): number {
   return events.reduce((sum, event) => sum + event.durationBeats, 0)
+}
+
+function getStaff(
+  measure: ReturnType<typeof convertTranscriptionToScore>['measures'][number] | undefined,
+  clef: 'treble' | 'bass',
+) {
+  const staff = measure?.staves.find(candidate => candidate.clef === clef)
+  if (!staff) {
+    throw new Error(`Missing ${clef} staff`)
+  }
+  return staff
+}
+
+function getVoiceEvents(
+  measure: ReturnType<typeof convertTranscriptionToScore>['measures'][number] | undefined,
+  clef: 'treble' | 'bass',
+) {
+  return getStaff(measure, clef).voices[0]!.events
+}
+
+function getSoundingPitches(
+  measure: ReturnType<typeof convertTranscriptionToScore>['measures'][number] | undefined,
+  clef: 'treble' | 'bass',
+): string[] {
+  return getStaff(measure, clef).voices.flatMap(voice =>
+    voice.events.flatMap(event => event.notes.map(note => note.pitch)))
 }

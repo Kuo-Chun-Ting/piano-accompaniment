@@ -23,9 +23,10 @@ test('test_buildPlaybackSchedule_when_score_has_two_measures_then_offsets_second
   // Assert
   expect(schedule.events).toEqual([
     {
-      id: 'measure-0-right-0',
+      id: 'measure-0-treble-treble-1-0',
       measureIndex: 0,
-      hand: 'right',
+      staffId: 'treble',
+      voiceId: 'treble-1',
       eventIndex: 0,
       startBeat: 1,
       durationBeats: 1,
@@ -34,9 +35,10 @@ test('test_buildPlaybackSchedule_when_score_has_two_measures_then_offsets_second
       pitches: ['C4'],
     },
     {
-      id: 'measure-0-left-0',
+      id: 'measure-0-bass-bass-1-0',
       measureIndex: 0,
-      hand: 'left',
+      staffId: 'bass',
+      voiceId: 'bass-1',
       eventIndex: 0,
       startBeat: 1,
       durationBeats: 2,
@@ -45,9 +47,10 @@ test('test_buildPlaybackSchedule_when_score_has_two_measures_then_offsets_second
       pitches: ['C3'],
     },
     {
-      id: 'measure-1-left-0',
+      id: 'measure-1-bass-bass-1-0',
       measureIndex: 1,
-      hand: 'left',
+      staffId: 'bass',
+      voiceId: 'bass-1',
       eventIndex: 0,
       startBeat: 2,
       durationBeats: 2,
@@ -77,9 +80,10 @@ test('test_buildPlaybackSchedule_when_tied_note_crosses_measure_then_schedules_o
 
   // Assert
   expect(schedule.events.filter(event => event.pitches.length > 0)).toEqual([{
-    id: 'measure-0-right-1',
+    id: 'measure-0-treble-treble-1-1',
     measureIndex: 0,
-    hand: 'right',
+    staffId: 'treble',
+    voiceId: 'treble-1',
     eventIndex: 1,
     startBeat: 3,
     durationBeats: 4,
@@ -87,6 +91,33 @@ test('test_buildPlaybackSchedule_when_tied_note_crosses_measure_then_schedules_o
     durationSeconds: 2,
     pitches: ['C4'],
   }])
+})
+
+test('test_buildPlaybackSchedule_when_tie_continues_in_another_voice_then_keeps_one_attack', () => {
+  // Arrange
+  const version = buildScoreVersion([
+    buildMeasure(
+      [buildEvent(1, 2, []), buildEvent(3, 2, ['C5'], true)],
+      [],
+    ),
+    buildMeasure(
+      [buildEvent(1, 4, [])],
+      [],
+      [
+        [buildEvent(1, 4, [])],
+        [buildEvent(1, 2, ['C5'], false, true), buildEvent(3, 2, [])],
+      ],
+    ),
+  ])
+
+  // Act
+  const notes = buildPlaybackSchedule(version, 120).events
+    .filter(event => event.pitches.length > 0)
+
+  // Assert
+  expect(notes).toEqual([
+    expect.objectContaining({ pitches: ['C5'], startSeconds: 1, durationSeconds: 2 }),
+  ])
 })
 
 test('test_buildPlaybackSchedule_when_next_note_is_not_tied_from_previous_then_keeps_repeated_attack', () => {
@@ -129,17 +160,18 @@ test('test_buildPlaybackSchedule_when_only_one_chord_pitch_is_tied_then_does_not
   const version = buildScoreVersion([
     buildMeasure([
       {
-        ...buildEvent(1, 1, ['C6']),
-        tieToNextPitches: ['C6'],
+        ...buildEvent(1, 1, ['C6'], true),
       },
       {
-        ...buildEvent(2, 1, ['E5', 'B5', 'C6']),
-        tieFromPreviousPitches: ['C6'],
-        tieToNextPitches: ['C6'],
+        ...buildEvent(2, 1, ['E5', 'B5']),
+        notes: [
+          { pitch: 'E5' },
+          { pitch: 'B5' },
+          { pitch: 'C6', tieFromPrevious: true, tieToNext: true },
+        ],
       },
       {
-        ...buildEvent(3, 1, ['C6']),
-        tieFromPreviousPitches: ['C6'],
+        ...buildEvent(3, 1, ['C6'], false, true),
       },
       buildEvent(4, 1, []),
     ], []),
@@ -156,36 +188,28 @@ test('test_buildPlaybackSchedule_when_only_one_chord_pitch_is_tied_then_does_not
   ])
 })
 
-test('test_buildPlaybackSchedule_when_precise_playback_notes_exist_then_uses_them_instead_of_notation', () => {
+test('test_buildPlaybackSchedule_when_staff_has_multiple_voices_then_plays_every_notated_voice', () => {
   // Arrange
-  const version: ScoreVersion = {
-    ...buildScoreVersion([
-      buildMeasure([buildEvent(1, 4, ['G6'])], []),
-    ]),
-    playbackNotes: [{
-      pitch: 'C4',
-      startBeatOffset: 0.25,
-      durationBeats: 0.85,
-      velocity: 83,
-    }],
-  }
+  const version = buildScoreVersion([
+    buildMeasure(
+      [buildEvent(1, 4, ['G6'])],
+      [],
+      [
+        [buildEvent(1, 4, ['G6'])],
+        [buildEvent(1, 2, ['C5']), buildEvent(3, 2, ['D5'])],
+      ],
+    ),
+  ])
 
   // Act
   const schedule = buildPlaybackSchedule(version, 60)
 
   // Assert
-  expect(schedule.events.filter(event => event.pitches.length > 0)).toEqual([{
-    id: 'playback-note-0',
-    measureIndex: 0,
-    hand: 'right',
-    eventIndex: 0,
-    startBeat: 1.25,
-    durationBeats: 0.85,
-    startSeconds: 0.25,
-    durationSeconds: 0.85,
-    pitches: ['C4'],
-    velocity: 83,
-  }])
+  expect(schedule.events.filter(event => event.pitches.length > 0)).toEqual([
+    expect.objectContaining({ voiceId: 'treble-1', pitches: ['G6'] }),
+    expect.objectContaining({ voiceId: 'treble-2', startBeat: 1, pitches: ['C5'] }),
+    expect.objectContaining({ voiceId: 'treble-2', startBeat: 3, pitches: ['D5'] }),
+  ])
 })
 
 test('test_buildPlaybackPosition_when_playing_inside_measure_then_returns_measure_and_active_events', () => {
@@ -206,7 +230,7 @@ test('test_buildPlaybackPosition_when_playing_inside_measure_then_returns_measur
     measureIndex: 0,
     measureProgress: 0.375,
     beat: 2.5,
-    activeEventIds: ['measure-0-right-0', 'measure-0-left-0'],
+    activeEventIds: ['measure-0-treble-treble-1-0', 'measure-0-bass-bass-1-0'],
   })
 })
 
@@ -281,7 +305,11 @@ function buildScoreVersion(measures: ScoreMeasure[]): ScoreVersion {
   }
 }
 
-function buildMeasure(rightHand: ScoreEvent[], leftHand: ScoreEvent[]): ScoreMeasure {
+function buildMeasure(
+  trebleEvents: ScoreEvent[],
+  bassEvents: ScoreEvent[],
+  trebleVoices: ScoreEvent[][] = [trebleEvents],
+): ScoreMeasure {
   return {
     sectionId: 'section',
     sectionLabel: 'Section',
@@ -289,8 +317,18 @@ function buildMeasure(rightHand: ScoreEvent[], leftHand: ScoreEvent[]): ScoreMea
     chordSymbols: [],
     lyrics: [],
     intensity: 'medium',
-    rightHand,
-    leftHand,
+    staves: [
+      {
+        id: 'treble',
+        clef: 'treble',
+        voices: trebleVoices.map((events, index) => ({ id: `treble-${index + 1}`, events })),
+      },
+      {
+        id: 'bass',
+        clef: 'bass',
+        voices: [{ id: 'bass-1', events: bassEvents }],
+      },
+    ],
   }
 }
 
@@ -304,9 +342,10 @@ function buildEvent(
   return {
     startBeat,
     durationBeats,
-    pitches,
-    fingers: [],
-    tieToNext,
-    ...(tieFromPrevious ? { tieFromPrevious } : {}),
+    notes: pitches.map(pitch => ({
+      pitch,
+      ...(tieToNext ? { tieToNext: true } : {}),
+      ...(tieFromPrevious ? { tieFromPrevious: true } : {}),
+    })),
   }
 }

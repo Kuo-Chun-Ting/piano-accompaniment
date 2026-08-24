@@ -38,7 +38,10 @@ const verificationCases: VerificationCase[] = [
 ]
 
 export async function runAudioScoreVerification(): Promise<void> {
-  const results = await Promise.all(verificationCases.map(verifyCase))
+  const results = []
+  for (const testCase of verificationCases) {
+    results.push(await verifyCase(testCase))
+  }
   console.log(JSON.stringify(results, null, 2))
 
   if (results.some(result => !result.ok)) {
@@ -65,15 +68,42 @@ async function verifyCase(testCase: VerificationCase) {
   })
   const notation = verifyScoreNotation(score.version)
   const separationMatchesReference = referenceHash === pianoHash
+  const visual = await verifyViewer(resolve(outputDirectory, 'index.html'))
 
   return {
     name: testCase.name,
     ok: separationMatchesReference
       && notation.issues.length === 0
-      && playback.issues.length === 0,
+      && playback.issues.length === 0
+      && visual.ok,
     separationMatchesReference,
     notationIssues: notation.issues,
     playbackIssues: playback.issues,
+    visualVerification: visual,
+  }
+}
+
+async function verifyViewer(viewerPath: string): Promise<{ ok: boolean, error?: string }> {
+  try {
+    await execFileAsync('npm', [
+      'run',
+      'test:e2e',
+      '--',
+      'tests/e2e/audio-score-viewer.spec.ts',
+    ], {
+      cwd: projectDirectory,
+      env: {
+        ...process.env,
+        AUDIO_SCORE_VIEWER_PATH: viewerPath,
+        PLAYWRIGHT_BASE_URL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3200',
+      },
+    })
+    return { ok: true }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
   }
 }
 

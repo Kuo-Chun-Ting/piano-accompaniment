@@ -11,9 +11,9 @@ export type PatternInput = {
   strongSection: boolean
 }
 
-export type HandPattern = {
-  leftHand: ScoreEvent[]
-  rightHand: ScoreEvent[]
+export type StaffPattern = {
+  bassEvents: ScoreEvent[]
+  trebleEvents: ScoreEvent[]
 }
 
 const NOTE_TO_SEMITONE: Record<string, number> = {
@@ -31,7 +31,7 @@ const NOTE_TO_SEMITONE: Record<string, number> = {
   B: 11,
 }
 
-export function buildHandPattern(input: PatternInput): HandPattern {
+export function buildStaffPattern(input: PatternInput): StaffPattern {
   if (input.level === 'easy') {
     return buildEasyPattern(input)
   }
@@ -47,18 +47,18 @@ export function buildHandPattern(input: PatternInput): HandPattern {
   return buildUrbanRichPattern(input)
 }
 
-function buildEasyPattern(input: PatternInput): HandPattern {
+function buildEasyPattern(input: PatternInput): StaffPattern {
   const voicing = buildRightHandVoicing(input.chord, false, input.strongSection)
   const root = buildLeftPitch(input.chord.bass || input.chord.root, 2)
   const units = splitDuration(input.durationBeats, 2)
 
   return {
-    leftHand: buildEvents(input.startBeat, units, () => [root], [5]),
-    rightHand: buildEvents(input.startBeat, units, () => voicing, [1, 3, 5]),
+    bassEvents: buildEvents(input.startBeat, units, () => [root], [5]),
+    trebleEvents: buildEvents(input.startBeat, units, () => voicing, [1, 3, 5]),
   }
 }
 
-function buildSpaciousRichPattern(input: PatternInput): HandPattern {
+function buildSpaciousRichPattern(input: PatternInput): StaffPattern {
   const tones = getChordToneNames(input.chord)
   const voicing = buildRightHandVoicing(input.chord, true, input.strongSection)
   const root = buildLeftPitch(input.chord.bass || input.chord.root, 2)
@@ -66,12 +66,12 @@ function buildSpaciousRichPattern(input: PatternInput): HandPattern {
   const units = splitDuration(input.durationBeats, 1)
 
   return {
-    leftHand: buildEvents(input.startBeat, units, (index) => [index % 2 === 0 ? root : fifth], [5]),
-    rightHand: buildEvents(input.startBeat, units, (index) => index % 2 === 0 ? voicing : [], [1, 2, 4, 5]),
+    bassEvents: buildEvents(input.startBeat, units, (index) => [index % 2 === 0 ? root : fifth], [5]),
+    trebleEvents: buildEvents(input.startBeat, units, (index) => index % 2 === 0 ? voicing : [], [1, 2, 4, 5]),
   }
 }
 
-function buildFlowingRichPattern(input: PatternInput): HandPattern {
+function buildFlowingRichPattern(input: PatternInput): StaffPattern {
   const tones = getChordToneNames(input.chord)
   const voicing = buildRightHandVoicing(input.chord, false, input.strongSection)
   const bassCycle = [input.chord.bass || input.chord.root, tones[2], input.chord.root, tones[2]]
@@ -79,12 +79,12 @@ function buildFlowingRichPattern(input: PatternInput): HandPattern {
   const units = splitDuration(input.durationBeats, 0.5)
 
   return {
-    leftHand: buildEvents(input.startBeat, units, (index) => [bassCycle[index % bassCycle.length]], [5, 2, 1, 2]),
-    rightHand: buildEvents(input.startBeat, units, (index) => [voicing[index % voicing.length]], [1, 2, 3, 5]),
+    bassEvents: buildEvents(input.startBeat, units, (index) => [bassCycle[index % bassCycle.length]], [5, 2, 1, 2]),
+    trebleEvents: buildEvents(input.startBeat, units, (index) => [voicing[index % voicing.length]], [1, 2, 3, 5]),
   }
 }
 
-function buildUrbanRichPattern(input: PatternInput): HandPattern {
+function buildUrbanRichPattern(input: PatternInput): StaffPattern {
   const tones = getChordToneNames(input.chord)
   const voicing = buildRightHandVoicing(input.chord, true, input.strongSection)
   const root = buildLeftPitch(input.chord.bass || input.chord.root, 2)
@@ -95,8 +95,8 @@ function buildUrbanRichPattern(input: PatternInput): HandPattern {
   const chordPattern = [[], voicing, [], voicing.slice(0, input.strongSection ? 4 : 3)]
 
   return {
-    leftHand: buildEvents(input.startBeat, units, (index) => bassPattern[index % bassPattern.length], [5, 1, 2]),
-    rightHand: buildEvents(input.startBeat, units, (index) => chordPattern[index % chordPattern.length], [1, 2, 4, 5]),
+    bassEvents: buildEvents(input.startBeat, units, (index) => bassPattern[index % bassPattern.length], [5, 1, 2]),
+    trebleEvents: buildEvents(input.startBeat, units, (index) => chordPattern[index % chordPattern.length], [1, 2, 4, 5]),
   }
 }
 
@@ -131,9 +131,10 @@ function buildEvents(
     const event = {
       startBeat: cursor,
       durationBeats,
-      pitches,
-      fingers: pitches.map((_, pitchIndex) => fingers[pitchIndex] || fingers.at(-1) || 1),
-      tieToNext: false,
+      notes: pitches.map((pitch, pitchIndex) => ({
+        pitch,
+        finger: fingers[pitchIndex] || fingers.at(-1) || 1,
+      })),
     }
     cursor += durationBeats
     return event

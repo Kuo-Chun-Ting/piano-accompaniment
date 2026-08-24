@@ -5,6 +5,7 @@ import { midiNumberToPitch } from './midiToScore'
 
 const ONSET_MATCH_TOLERANCE_SECONDS = 0.25
 const DURATION_TOLERANCE_SECONDS = 0.25
+const MAX_HAND_SPAN_SEMITONES = 16
 
 export type ScorePlaybackVerificationInput = {
   version: ScoreVersion
@@ -26,9 +27,21 @@ export type ScorePlaybackVerificationResult = {
 }
 
 export type ScoreNotationVerificationIssue =
-  | { kind: 'measure-duration', hand: 'right' | 'left', measureIndex: number }
+  | {
+    kind: 'measure-duration'
+    staffId: 'treble' | 'bass'
+    voiceId: string
+    measureIndex: number
+  }
   | { kind: 'invalid-tie', pitch: string, measureIndex: number }
   | { kind: 'invalid-pedal-interval' }
+  | {
+    kind: 'unplayable-staff-span'
+    staffId: 'treble' | 'bass'
+    measureIndex: number
+    startBeat: number
+    spanSemitones: number
+  }
 
 export type ScoreNotationVerificationResult = {
   issues: ScoreNotationVerificationIssue[]
@@ -38,34 +51,47 @@ export function verifyScoreNotation(version: ScoreVersion): ScoreNotationVerific
   const issues: ScoreNotationVerificationIssue[] = []
 
   version.measures.forEach((measure) => {
-    for (const [hand, events] of [
-      ['right', measure.rightHand],
-      ['left', measure.leftHand],
-    ] as const) {
-      let expectedStartBeat = 1
-      for (const event of events) {
-        if (event.startBeat !== expectedStartBeat || event.durationBeats <= 0) {
-          expectedStartBeat = Number.NaN
-          break
+    for (const staff of measure.staves) {
+      issues.push(...findUnplayableStaffSpans(staff, measure.index))
+      for (const voice of staff.voices) {
+        let expectedStartBeat = 1
+        for (const event of voice.events) {
+          if (event.startBeat !== expectedStartBeat || event.durationBeats <= 0) {
+            expectedStartBeat = Number.NaN
+            break
+          }
+          expectedStartBeat += event.durationBeats
         }
-        expectedStartBeat += event.durationBeats
-      }
-      if (expectedStartBeat !== 5) {
-        issues.push({ kind: 'measure-duration', hand, measureIndex: measure.index })
+        if (expectedStartBeat !== 5) {
+          issues.push({
+            kind: 'measure-duration',
+            staffId: staff.id,
+            voiceId: voice.id,
+            measureIndex: measure.index,
+          })
+        }
       }
     }
   })
 
-  for (const hand of ['rightHand', 'leftHand'] as const) {
-    const events = version.measures.flatMap(measure =>
-      measure[hand].map(event => ({ event, measureIndex: measure.index })))
-    events.forEach(({ event, measureIndex }, index) => {
-      for (const pitch of event.tieToNextPitches ?? []) {
-        const nextEvent = events[index + 1]?.event
-        if (!event.pitches.includes(pitch)
-          || !nextEvent?.pitches.includes(pitch)
-          || !nextEvent.tieFromPreviousPitches?.includes(pitch)) {
-          issues.push({ kind: 'invalid-tie', pitch, measureIndex })
+  for (const staffId of ['treble', 'bass'] as const) {
+    const events = version.measures.flatMap((measure, measureOffset) => {
+      const staff = measure.staves.find(candidate => candidate.id === staffId)
+      return (staff?.voices ?? []).flatMap(voice => voice.events.map(event => ({
+        event,
+        measureIndex: measure.index,
+        startBeatOffset: measureOffset * 4 + event.startBeat - 1,
+        endBeatOffset: measureOffset * 4 + event.startBeat - 1 + event.durationBeats,
+      })))
+    })
+    events.forEach((current) => {
+      for (const note of current.event.notes.filter(candidate => candidate.tieToNext)) {
+        const continuation = events.some(candidate =>
+          candidate.startBeatOffset === current.endBeatOffset
+          && candidate.event.notes.some(nextNote =>
+            nextNote.pitch === note.pitch && nextNote.tieFromPrevious))
+        if (!continuation) {
+          issues.push({ kind: 'invalid-tie', pitch: note.pitch, measureIndex: current.measureIndex })
         }
       }
     })
@@ -80,6 +106,36 @@ export function verifyScoreNotation(version: ScoreVersion): ScoreNotationVerific
   }
 
   return { issues }
+}
+
+function findUnplayableStaffSpans(
+  staff: ScoreVersion['measures'][number]['staves'][number],
+  measureIndex: number,
+): ScoreNotationVerificationIssue[] {
+  const startBeats = [...new Set(staff.voices.flatMap(voice =>
+    voice.events.map(event => event.startBeat)))].sort((left, right) => left - right)
+
+  return startBeats.flatMap((startBeat) => {
+    const pitches = staff.voices.flatMap(voice =>
+      voice.events
+        .filter(event => event.startBeat <= startBeat
+          && startBeat < event.startBeat + event.durationBeats)
+        .flatMap(event => event.notes.map(note => pitchToMidi(note.pitch))))
+    if (pitches.length < 2) {
+      return []
+    }
+
+    const spanSemitones = Math.max(...pitches) - Math.min(...pitches)
+    return spanSemitones > MAX_HAND_SPAN_SEMITONES
+      ? [{
+          kind: 'unplayable-staff-span' as const,
+          staffId: staff.id,
+          measureIndex,
+          startBeat,
+          spanSemitones,
+        }]
+      : []
+  })
 }
 
 export function verifyScorePlayback(
@@ -136,12 +192,50 @@ function buildActualNotes(version: ScoreVersion, bpm: number): ComparableNote[] 
 
 function buildExpectedNotes(input: ScorePlaybackVerificationInput): ComparableNote[] {
   const pedalIntervals = buildPedalIntervals(input.pedalEvents)
+  const cellsPerBeat = 2
+  const secondsPerBeat = 60 / input.bpm
+  const totalCells = input.version.measures.length * 4 * cellsPerBeat
+  const quantizedByAttack = new Map<string, { midi: number, startCell: number, endCell: number }>()
 
-  return input.notes
-    .filter(note => note.endSeconds > input.originSeconds)
+  for (const note of input.notes) {
+    const startBeatOffset = (note.startSeconds - input.originSeconds) / secondsPerBeat
+    const endBeatOffset = (note.endSeconds - input.originSeconds) / secondsPerBeat
+    if (note.endSeconds <= input.originSeconds || startBeatOffset >= totalCells / cellsPerBeat) {
+      continue
+    }
+    const startCell = clampInteger(Math.round(startBeatOffset * cellsPerBeat), 0, totalCells - 1)
+    const endCell = clampInteger(
+      Math.max(startCell + 1, Math.round(endBeatOffset * cellsPerBeat)),
+      1,
+      totalCells,
+    )
+    const key = `${note.midi}:${startCell}`
+    const existing = quantizedByAttack.get(key)
+    if (!existing || existing.endCell < endCell) {
+      quantizedByAttack.set(key, { midi: note.midi, startCell, endCell })
+    }
+  }
+
+  const notesByMidi = new Map<number, Array<{ midi: number, startCell: number, endCell: number }>>()
+  for (const note of quantizedByAttack.values()) {
+    notesByMidi.set(note.midi, [...(notesByMidi.get(note.midi) ?? []), note])
+  }
+  for (const notes of notesByMidi.values()) {
+    notes.sort((left, right) => left.startCell - right.startCell)
+    notes.forEach((note, index) => {
+      const nextAttack = notes[index + 1]?.startCell
+      if (nextAttack !== undefined && note.endCell > nextAttack) {
+        note.endCell = nextAttack
+      }
+    })
+  }
+
+  return [...quantizedByAttack.values()]
+    .filter(note => note.endCell > note.startCell)
     .map((note) => {
-      const startSeconds = Math.max(note.startSeconds - input.originSeconds, 0)
-      const audibleEndSeconds = findAudibleEndSeconds(note.endSeconds, pedalIntervals)
+      const startSeconds = note.startCell / cellsPerBeat * secondsPerBeat
+      const endSeconds = input.originSeconds + note.endCell / cellsPerBeat * secondsPerBeat
+      const audibleEndSeconds = findAudibleEndSeconds(endSeconds, pedalIntervals)
       return {
         midi: note.midi,
         pitch: midiNumberToPitch(note.midi),
@@ -149,6 +243,10 @@ function buildExpectedNotes(input: ScorePlaybackVerificationInput): ComparableNo
         durationSeconds: audibleEndSeconds - input.originSeconds - startSeconds,
       }
     })
+}
+
+function clampInteger(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum)
 }
 
 function findExpectedMatch(

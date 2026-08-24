@@ -16,8 +16,18 @@ function buildMeasure(index: number): ScoreMeasure {
     chordSymbols: ['C'],
     lyrics: [],
     intensity: 'medium',
-    rightHand: [],
-    leftHand: [],
+    staves: [
+      {
+        id: 'treble',
+        clef: 'treble',
+        voices: [{ id: 'treble-1', events: [{ startBeat: 1, durationBeats: 4, notes: [] }] }],
+      },
+      {
+        id: 'bass',
+        clef: 'bass',
+        voices: [{ id: 'bass-1', events: [{ startBeat: 1, durationBeats: 4, notes: [] }] }],
+      },
+    ],
   }
 }
 

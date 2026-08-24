@@ -2,7 +2,9 @@ import type {
   ScoreEvent,
   ScoreLyricCue,
   ScoreMeasure,
+  ScoreNote,
   ScorePedalInterval,
+  ScoreStaff,
   ScoreVersion,
 } from '../arrangement/types'
 import type {
@@ -16,7 +18,8 @@ import { inferKeySignature, type PitchSpelling } from './keySignature'
 const BEATS_PER_MEASURE = 4
 const CELLS_PER_BEAT = 2
 const CELLS_PER_MEASURE = BEATS_PER_MEASURE * CELLS_PER_BEAT
-const HAND_SPLIT_MIDI = 60
+const PREFERRED_HAND_SPAN_SEMITONES = 12
+const MIDDLE_C_MIDI = 60
 const SHARP_NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const
 const FLAT_NOTE_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'] as const
 
@@ -26,12 +29,18 @@ type QuantizedNote = {
   endCell: number
 }
 
-type ScoreGridCell = {
-  attacks: Set<number>
-  pitches: Set<number>
+type AssignedNote = QuantizedNote & {
+  staffId: ScoreStaff['id']
 }
 
 type OnsetGroups = Map<number, QuantizedNote[]>
+
+type MeasureNote = QuantizedNote & {
+  startCell: number
+  endCell: number
+  tieFromPrevious: boolean
+  tieToNext: boolean
+}
 
 export function convertTranscriptionToScore(input: TranscriptionInput): ScoreVersion {
   validateInput(input)
@@ -46,17 +55,9 @@ export function convertTranscriptionToScore(input: TranscriptionInput): ScoreVer
   )
   const totalCells = measureCount * CELLS_PER_MEASURE
   const onsetGroups = groupNotesByOnset(input.notes, input.bpm, originSeconds, totalCells)
-  const { leftGroups, rightGroups } = splitOnsetsBetweenHands(onsetGroups)
-  const leftGrid = buildHandGrid(leftGroups, totalCells)
-  const rightGrid = buildHandGrid(rightGroups, totalCells)
+  const quantizedNotes = truncateNotesAtRepeatedAttack([...onsetGroups.values()].flat())
+  const assignedNotes = assignNotesToStaves(quantizedNotes)
   const keySignature = inferKeySignature(input.notes)
-  const playbackNotes = buildPlaybackNotes(
-    input.notes,
-    input.bpm,
-    originSeconds,
-    measureCount * BEATS_PER_MEASURE,
-    keySignature.spelling,
-  )
   const pedalIntervals = buildPedalIntervals(
     input.pedalEvents ?? [],
     input.bpm,
@@ -74,44 +75,15 @@ export function convertTranscriptionToScore(input: TranscriptionInput): ScoreVer
   return {
     level: 'rich',
     keySignature: keySignature.name,
-    playbackNotes,
     measures: Array.from({ length: measureCount }, (_, measureIndex) =>
       buildMeasure(
         measureIndex,
-        leftGrid,
-        rightGrid,
+        assignedNotes,
         keySignature.spelling,
         lyricsByMeasure.get(measureIndex) ?? [],
       )),
     ...(pedalIntervals.length > 0 ? { pedalIntervals } : {}),
   }
-}
-
-function buildPlaybackNotes(
-  notes: TranscribedNote[],
-  bpm: number,
-  originSeconds: number,
-  totalBeats: number,
-  spelling: PitchSpelling,
-) {
-  return notes.flatMap((note) => {
-    if (!isValidNote(note) || note.endSeconds <= originSeconds) {
-      return []
-    }
-
-    const startBeatOffset = Math.max(0, (note.startSeconds - originSeconds) * bpm / 60)
-    const endBeatOffset = Math.min(totalBeats, (note.endSeconds - originSeconds) * bpm / 60)
-    if (startBeatOffset >= totalBeats || endBeatOffset <= startBeatOffset) {
-      return []
-    }
-
-    return [{
-      pitch: midiNumberToPitch(note.midi, spelling),
-      startBeatOffset,
-      durationBeats: endBeatOffset - startBeatOffset,
-      velocity: note.velocity,
-    }]
-  })
 }
 
 function buildLyricsByMeasure(
@@ -354,54 +326,9 @@ function isValidNote(note: TranscribedNote): boolean {
     && note.endSeconds > note.startSeconds
 }
 
-function splitOnsetsBetweenHands(onsetGroups: OnsetGroups): {
-  leftGroups: OnsetGroups
-  rightGroups: OnsetGroups
-} {
-  const leftGroups: OnsetGroups = new Map()
-  const rightGroups: OnsetGroups = new Map()
-
-  for (const [startCell, notes] of onsetGroups) {
-    const sorted = [...notes].sort((left, right) => left.midi - right.midi)
-    const splitIndex = findBestHandSplit(sorted)
-    if (splitIndex > 0) {
-      leftGroups.set(startCell, sorted.slice(0, splitIndex))
-    }
-    if (splitIndex < sorted.length) {
-      rightGroups.set(startCell, sorted.slice(splitIndex))
-    }
-  }
-
-  return { leftGroups, rightGroups }
-}
-
-function findBestHandSplit(notes: QuantizedNote[]): number {
-  const firstRightHandNote = notes.findIndex(note => note.midi >= HAND_SPLIT_MIDI)
-  return firstRightHandNote === -1 ? notes.length : firstRightHandNote
-}
-
-function buildHandGrid(onsetGroups: OnsetGroups, totalCells: number): ScoreGridCell[] {
-  const grid = Array.from({ length: totalCells }, (): ScoreGridCell => ({
-    attacks: new Set<number>(),
-    pitches: new Set<number>(),
-  }))
-
-  for (const [startCell, notes] of onsetGroups) {
-    for (const note of notes) {
-      grid[startCell]!.attacks.add(note.midi)
-      for (let cellIndex = startCell; cellIndex < note.endCell; cellIndex += 1) {
-        grid[cellIndex]!.pitches.add(note.midi)
-      }
-    }
-  }
-
-  return grid
-}
-
 function buildMeasure(
   measureIndex: number,
-  leftGrid: ScoreGridCell[],
-  rightGrid: ScoreGridCell[],
+  notes: AssignedNote[],
   spelling: PitchSpelling,
   lyrics: ScoreLyricCue[],
 ): ScoreMeasure {
@@ -412,72 +339,168 @@ function buildMeasure(
     chordSymbols: [],
     lyrics,
     intensity: 'medium',
-    leftHand: buildMeasureEvents(leftGrid, measureIndex, spelling),
-    rightHand: buildMeasureEvents(rightGrid, measureIndex, spelling),
+    staves: [
+      buildMeasureStaff('treble', measureIndex, notes, spelling),
+      buildMeasureStaff('bass', measureIndex, notes, spelling),
+    ],
   }
 }
 
-function buildMeasureEvents(
-  grid: ScoreGridCell[],
+function buildMeasureStaff(
+  clef: ScoreStaff['clef'],
   measureIndex: number,
+  notes: AssignedNote[],
   spelling: PitchSpelling,
-): ScoreEvent[] {
+): ScoreStaff {
   const measureStart = measureIndex * CELLS_PER_MEASURE
   const measureEnd = measureStart + CELLS_PER_MEASURE
-  const events: ScoreEvent[] = []
-  let cellIndex = measureStart
+  const measureNotes = notes
+    .filter(note => note.staffId === clef)
+    .filter(note => note.startCell < measureEnd && note.endCell > measureStart)
+    .map((note): MeasureNote => ({
+      ...note,
+      startCell: Math.max(note.startCell, measureStart),
+      endCell: Math.min(note.endCell, measureEnd),
+      tieFromPrevious: note.startCell < measureStart,
+      tieToNext: note.endCell > measureEnd,
+    }))
+  const voices = [{
+    id: `${clef}-1`,
+    events: buildTimelineEvents(measureNotes, measureStart, measureEnd, spelling),
+  }]
 
-  while (cellIndex < measureEnd) {
-    const pitches = sortedPitches(grid[cellIndex]?.pitches)
-    let runEnd = cellIndex + 1
+  return { id: clef, clef, voices }
+}
 
-    while (runEnd < measureEnd
-      && grid[runEnd]?.attacks.size === 0
-      && samePitches(pitches, sortedPitches(grid[runEnd]?.pitches))) {
-      runEnd += 1
+function assignNotesToStaves(notes: QuantizedNote[]): AssignedNote[] {
+  const conflicts = notes.map(() => [] as number[])
+  notes.forEach((note, noteIndex) => {
+    for (let candidateIndex = noteIndex + 1; candidateIndex < notes.length; candidateIndex += 1) {
+      const candidate = notes[candidateIndex]!
+      const overlaps = note.startCell < candidate.endCell && candidate.startCell < note.endCell
+      if (overlaps && Math.abs(note.midi - candidate.midi) > PREFERRED_HAND_SPAN_SEMITONES) {
+        conflicts[noteIndex]!.push(candidateIndex)
+        conflicts[candidateIndex]!.push(noteIndex)
+      }
+    }
+  })
+
+  const staffByNote = new Array<ScoreStaff['id']>(notes.length)
+  const colors = new Array<0 | 1 | undefined>(notes.length)
+
+  notes.forEach((_, rootIndex) => {
+    if (colors[rootIndex] !== undefined) {
+      return
     }
 
-    let remainingCells = runEnd - cellIndex
-    while (remainingCells > 0) {
-      const durationCells = nextSupportedDuration(remainingCells)
-      const eventEnd = cellIndex + durationCells
-      const previousPitches = grid[cellIndex - 1]?.pitches
-      const nextPitches = grid[eventEnd]?.pitches
-      const tieFromPrevious = pitches.filter(pitch =>
-        previousPitches?.has(pitch) && !grid[cellIndex]?.attacks.has(pitch))
-      const tieToNext = pitches.filter(pitch =>
-        nextPitches?.has(pitch) && !grid[eventEnd]?.attacks.has(pitch))
-      const spelledPitches = pitches.map(midi => midiNumberToPitch(midi, spelling))
-      const tieFromPreviousPitches = tieFromPrevious.map(midi => midiNumberToPitch(midi, spelling))
-      const tieToNextPitches = tieToNext.map(midi => midiNumberToPitch(midi, spelling))
+    const component: number[] = []
+    const queue = [rootIndex]
+    colors[rootIndex] = 0
+    let isBipartite = true
 
-      events.push({
-        startBeat: 1 + (cellIndex - measureStart) / CELLS_PER_BEAT,
-        durationBeats: durationCells / CELLS_PER_BEAT,
-        pitches: spelledPitches,
-        fingers: [],
-        tieToNext: tieToNext.length === pitches.length && pitches.length > 0,
-        ...(tieFromPrevious.length === pitches.length && pitches.length > 0
-          ? { tieFromPrevious: true }
-          : {}),
-        ...(tieFromPreviousPitches.length > 0 ? { tieFromPreviousPitches } : {}),
-        ...(tieToNextPitches.length > 0 ? { tieToNextPitches } : {}),
+    for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
+      const noteIndex = queue[queueIndex]!
+      component.push(noteIndex)
+      for (const candidateIndex of conflicts[noteIndex]!) {
+        if (colors[candidateIndex] === undefined) {
+          colors[candidateIndex] = colors[noteIndex] === 0 ? 1 : 0
+          queue.push(candidateIndex)
+        } else if (colors[candidateIndex] === colors[noteIndex]) {
+          isBipartite = false
+        }
+      }
+    }
+
+    if (!isBipartite) {
+      component.forEach((noteIndex) => {
+        staffByNote[noteIndex] = notes[noteIndex]!.midi <= MIDDLE_C_MIDI ? 'bass' : 'treble'
       })
+      return
+    }
 
-      cellIndex = eventEnd
-      remainingCells -= durationCells
+    const normalCost = getComponentRegisterCost(component, colors, notes, false)
+    const reversedCost = getComponentRegisterCost(component, colors, notes, true)
+    const reverse = reversedCost < normalCost
+    component.forEach((noteIndex) => {
+      const color = colors[noteIndex]!
+      staffByNote[noteIndex] = (color === Number(reverse)) ? 'bass' : 'treble'
+    })
+  })
+
+  return notes.map((note, index) => ({ ...note, staffId: staffByNote[index]! }))
+}
+
+function getComponentRegisterCost(
+  component: number[],
+  colors: Array<0 | 1 | undefined>,
+  notes: QuantizedNote[],
+  reverse: boolean,
+): number {
+  return component.reduce((total, noteIndex) => {
+    const midi = notes[noteIndex]!.midi
+    const isBass = colors[noteIndex] === Number(reverse)
+    const penalty = isBass
+      ? Math.max(0, midi - MIDDLE_C_MIDI) ** 2
+      : Math.max(0, MIDDLE_C_MIDI + 1 - midi) ** 2
+    return total + penalty
+  }, 0)
+}
+
+function truncateNotesAtRepeatedAttack(notes: QuantizedNote[]): QuantizedNote[] {
+  const byMidi = new Map<number, QuantizedNote[]>()
+  for (const note of notes) {
+    byMidi.set(note.midi, [...(byMidi.get(note.midi) ?? []), note])
+  }
+
+  for (const matchingNotes of byMidi.values()) {
+    matchingNotes.sort((left, right) => left.startCell - right.startCell)
+    matchingNotes.forEach((note, index) => {
+      const nextAttack = matchingNotes[index + 1]?.startCell
+      if (nextAttack !== undefined && note.endCell > nextAttack) {
+        note.endCell = nextAttack
+      }
+    })
+  }
+  return notes.filter(note => note.endCell > note.startCell)
+}
+
+function buildTimelineEvents(
+  notes: MeasureNote[],
+  measureStart: number,
+  measureEnd: number,
+  spelling: PitchSpelling,
+): ScoreEvent[] {
+  const boundaries = [...new Set([
+    measureStart,
+    measureEnd,
+    ...notes.flatMap(note => [note.startCell, note.endCell]),
+  ])].sort((left, right) => left - right)
+  const events: ScoreEvent[] = []
+
+  for (let boundaryIndex = 0; boundaryIndex < boundaries.length - 1; boundaryIndex += 1) {
+    let cursor = boundaries[boundaryIndex]!
+    const boundaryEnd = boundaries[boundaryIndex + 1]!
+    while (cursor < boundaryEnd) {
+      const durationCells = nextSupportedDuration(boundaryEnd - cursor)
+      const segmentEnd = cursor + durationCells
+      const activeNotes = notes
+        .filter(note => note.startCell <= cursor && note.endCell >= segmentEnd)
+        .sort((left, right) => left.midi - right.midi)
+      const scoreNotes = activeNotes.map((note): ScoreNote => ({
+        pitch: midiNumberToPitch(note.midi, spelling),
+        ...(note.tieFromPrevious || cursor > note.startCell ? { tieFromPrevious: true } : {}),
+        ...(note.tieToNext || segmentEnd < note.endCell ? { tieToNext: true } : {}),
+      }))
+      events.push({
+        startBeat: 1 + (cursor - measureStart) / CELLS_PER_BEAT,
+        durationBeats: durationCells / CELLS_PER_BEAT,
+        notes: scoreNotes,
+      })
+      cursor = segmentEnd
     }
   }
 
   return events
-}
-
-function sortedPitches(pitches: Set<number> | undefined): number[] {
-  return pitches ? [...pitches].sort((left, right) => left - right) : []
-}
-
-function samePitches(left: number[], right: number[]): boolean {
-  return left.length === right.length && left.every((pitch, index) => pitch === right[index])
 }
 
 function nextSupportedDuration(remainingCells: number): number {

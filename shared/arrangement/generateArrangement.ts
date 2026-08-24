@@ -1,6 +1,6 @@
 import { parseChordSymbol } from '../music/chords'
 import type { ConfirmedChart, ConfirmedChordPlacement } from '../schemas/chart'
-import { buildHandPattern } from './patterns'
+import { buildStaffPattern } from './patterns'
 import type {
   ArrangementLevelName,
   ArrangementSet,
@@ -42,8 +42,8 @@ function buildScoreMeasure(
 ): ScoreMeasure {
   const intensity = getSectionIntensity(section.label)
   let startBeat = 1
-  const leftHand: ScoreEvent[] = []
-  const rightHand: ScoreEvent[] = []
+  const bassEvents: ScoreEvent[] = []
+  const trebleEvents: ScoreEvent[] = []
   const lyrics: ScoreLyricCue[] = buildMeasureLyrics(measure)
 
   for (const placement of measure.chords) {
@@ -53,7 +53,7 @@ function buildScoreMeasure(
       throw new Error(`Unsupported chord reached score builder: ${placement.chord}`)
     }
 
-    const pattern = buildHandPattern({
+    const pattern = buildStaffPattern({
       chord,
       durationBeats: placement.durationBeats,
       startBeat,
@@ -61,14 +61,14 @@ function buildScoreMeasure(
       level,
       strongSection: intensity === 'strong',
     })
-    const firstRightHandEvent = pattern.rightHand[0]
+    const firstTrebleEvent = pattern.trebleEvents[0]
 
-    if (firstRightHandEvent) {
-      firstRightHandEvent.chordSymbol = placement.chord
+    if (firstTrebleEvent) {
+      firstTrebleEvent.chordSymbol = placement.chord
     }
 
-    leftHand.push(...pattern.leftHand)
-    rightHand.push(...pattern.rightHand)
+    bassEvents.push(...pattern.bassEvents)
+    trebleEvents.push(...pattern.trebleEvents)
     startBeat += placement.durationBeats
   }
 
@@ -79,8 +79,10 @@ function buildScoreMeasure(
     chordSymbols: measure.chords.map((placement) => placement.chord),
     lyrics,
     intensity,
-    leftHand,
-    rightHand,
+    staves: [
+      { id: 'treble', clef: 'treble', voices: [{ id: 'treble-1', events: trebleEvents }] },
+      { id: 'bass', clef: 'bass', voices: [{ id: 'bass-1', events: bassEvents }] },
+    ],
   }
 }
 
@@ -136,19 +138,23 @@ function buildChordIssues(placement: ConfirmedChordPlacement): string[] {
 
 function validateScoreVersion(version: ScoreVersion): void {
   for (const measure of version.measures) {
-    validateHandDuration(measure.leftHand, measure, 'left')
-    validateHandDuration(measure.rightHand, measure, 'right')
+    for (const staff of measure.staves) {
+      for (const voice of staff.voices) {
+        validateVoiceDuration(voice.events, measure, staff.id, voice.id)
+      }
+    }
   }
 }
 
-function validateHandDuration(
-  events: ScoreEvent[],
+function validateVoiceDuration(
+  events: Array<{ durationBeats: number }>,
   measure: ScoreMeasure,
-  hand: 'left' | 'right',
+  staffId: string,
+  voiceId: string,
 ): void {
   const total = events.reduce((duration, event) => duration + event.durationBeats, 0)
 
   if (Math.abs(total - 4) > Number.EPSILON) {
-    throw new Error(`${hand} hand does not fill four beats in ${measure.sectionLabel} measure ${measure.index}`)
+    throw new Error(`${staffId} staff voice ${voiceId} does not fill four beats in ${measure.sectionLabel} measure ${measure.index}`)
   }
 }

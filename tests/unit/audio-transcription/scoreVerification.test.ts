@@ -71,7 +71,10 @@ test('test_verifyScoreNotation_when_measure_tie_and_pedal_are_invalid_then_repor
   // Arrange
   const version = {
     ...buildVersion([
-      { ...buildEvent(1, 2, ['C4']), tieToNextPitches: ['E4'] },
+      {
+        ...buildEvent(1, 2, ['C4']),
+        notes: [{ pitch: 'E4', tieToNext: true }],
+      },
       buildEvent(3, 1, ['D4']),
     ]),
     pedalIntervals: [{ startBeatOffset: 3, endBeatOffset: 2 }],
@@ -82,13 +85,114 @@ test('test_verifyScoreNotation_when_measure_tie_and_pedal_are_invalid_then_repor
 
   // Assert
   expect(result.issues).toEqual([
-    expect.objectContaining({ kind: 'measure-duration', hand: 'right', measureIndex: 1 }),
+    expect.objectContaining({
+      kind: 'measure-duration',
+      staffId: 'treble',
+      voiceId: 'treble-1',
+      measureIndex: 1,
+    }),
     expect.objectContaining({ kind: 'invalid-tie', pitch: 'E4', measureIndex: 1 }),
     expect.objectContaining({ kind: 'invalid-pedal-interval' }),
   ])
 })
 
-function buildVersion(rightHand: ReturnType<typeof buildEvent>[]): ScoreVersion {
+test('test_verifyScoreNotation_when_tie_continues_in_another_voice_then_accepts_it', () => {
+  // Arrange
+  const version = buildVersion([
+    buildEvent(1, 2, []),
+    { ...buildEvent(3, 2, ['C4']), notes: [{ pitch: 'C4', tieToNext: true }] },
+  ])
+  version.measures.push({
+    ...version.measures[0]!,
+    index: 2,
+    staves: [
+      {
+        id: 'treble',
+        clef: 'treble',
+        voices: [
+          { id: 'treble-1', events: [buildEvent(1, 4, [])] },
+          {
+            id: 'treble-2',
+            events: [
+              { ...buildEvent(1, 2, ['C4']), notes: [{ pitch: 'C4', tieFromPrevious: true }] },
+              buildEvent(3, 2, []),
+            ],
+          },
+        ],
+      },
+      {
+        id: 'bass',
+        clef: 'bass',
+        voices: [{ id: 'bass-1', events: [buildEvent(1, 4, [])] }],
+      },
+    ],
+  })
+
+  // Act
+  const result = verifyScoreNotation(version)
+
+  // Assert
+  expect(result.issues).toEqual([])
+})
+
+test('test_verifyScoreNotation_when_staff_chord_exceeds_major_tenth_then_reports_unplayable_span', () => {
+  // Arrange
+  const version = buildVersion([buildEvent(1, 4, [])])
+  version.measures[0]!.staves.find(staff => staff.id === 'bass')!.voices[0]!.events = [
+    buildEvent(1, 4, ['F2', 'B3']),
+  ]
+
+  // Act
+  const result = verifyScoreNotation(version)
+
+  // Assert
+  expect(result.issues).toEqual([
+    {
+      kind: 'unplayable-staff-span',
+      staffId: 'bass',
+      measureIndex: 1,
+      startBeat: 1,
+      spanSemitones: 18,
+    },
+  ])
+})
+
+test('test_verifyScoreNotation_when_parallel_voices_exceed_major_tenth_then_reports_combined_span', () => {
+  // Arrange
+  const version = buildVersion([buildEvent(1, 4, [])])
+  version.measures[0]!.staves.find(staff => staff.id === 'bass')!.voices = [
+    { id: 'bass-1', events: [buildEvent(1, 4, ['F2'])] },
+    { id: 'bass-2', events: [buildEvent(1, 4, ['B3'])] },
+  ]
+
+  // Act
+  const result = verifyScoreNotation(version)
+
+  // Assert
+  expect(result.issues).toContainEqual({
+    kind: 'unplayable-staff-span',
+    staffId: 'bass',
+    measureIndex: 1,
+    startBeat: 1,
+    spanSemitones: 18,
+  })
+})
+
+test('test_verifyScoreNotation_when_staff_chord_is_a_major_tenth_then_accepts_reachable_limit', () => {
+  // Arrange
+  const version = buildVersion([buildEvent(1, 4, [])])
+  version.measures[0]!.staves.find(staff => staff.id === 'bass')!.voices[0]!.events = [
+    buildEvent(1, 4, ['F2', 'A3']),
+  ]
+
+  // Act
+  const result = verifyScoreNotation(version)
+
+  // Assert
+  expect(result.issues).toEqual([])
+})
+
+function buildVersion(trebleEvents: ReturnType<typeof buildEvent>[]): ScoreVersion {
   return {
     level: 'rich',
     measures: [{
@@ -98,8 +202,18 @@ function buildVersion(rightHand: ReturnType<typeof buildEvent>[]): ScoreVersion 
       chordSymbols: [],
       lyrics: [],
       intensity: 'medium',
-      rightHand,
-      leftHand: [buildEvent(1, 4, [])],
+      staves: [
+        {
+          id: 'treble',
+          clef: 'treble',
+          voices: [{ id: 'treble-1', events: trebleEvents }],
+        },
+        {
+          id: 'bass',
+          clef: 'bass',
+          voices: [{ id: 'bass-1', events: [buildEvent(1, 4, [])] }],
+        },
+      ],
     }],
   }
 }
@@ -108,8 +222,6 @@ function buildEvent(startBeat: number, durationBeats: number, pitches: string[])
   return {
     startBeat,
     durationBeats,
-    pitches,
-    fingers: [],
-    tieToNext: false,
+    notes: pitches.map(pitch => ({ pitch })),
   }
 }

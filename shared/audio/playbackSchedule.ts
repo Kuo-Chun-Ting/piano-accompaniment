@@ -2,12 +2,11 @@ import type { ScorePedalInterval, ScoreVersion } from '../arrangement/types'
 
 export const BEATS_PER_MEASURE = 4
 
-export type PlaybackHand = 'left' | 'right'
-
 export type PlaybackEvent = {
   id: string
   measureIndex: number
-  hand: PlaybackHand
+  staffId: 'treble' | 'bass'
+  voiceId: string
   eventIndex: number
   startBeat: number
   durationBeats: number
@@ -36,12 +35,7 @@ export type PlaybackPosition = {
 
 export function buildPlaybackSchedule(version: ScoreVersion, bpm: number): PlaybackSchedule {
   const secondsPerBeat = 60 / bpm
-  const events = version.playbackNotes?.length
-    ? buildPrecisePlaybackEvents(version.playbackNotes, secondsPerBeat)
-    : [
-        ...buildHandEvents(version.measures, 'right', secondsPerBeat),
-        ...buildHandEvents(version.measures, 'left', secondsPerBeat),
-      ]
+  const events = buildNotationEvents(version.measures, secondsPerBeat)
   applyPedalSustain(events, version.pedalIntervals ?? [], secondsPerBeat)
 
   return {
@@ -50,39 +44,6 @@ export function buildPlaybackSchedule(version: ScoreVersion, bpm: number): Playb
     secondsPerBeat,
     measureCount: version.measures.length,
   }
-}
-
-function buildPrecisePlaybackEvents(
-  notes: NonNullable<ScoreVersion['playbackNotes']>,
-  secondsPerBeat: number,
-): PlaybackEvent[] {
-  return notes.map((note, index) => {
-    const measureIndex = Math.floor(note.startBeatOffset / BEATS_PER_MEASURE)
-    return {
-      id: `playback-note-${index}`,
-      measureIndex,
-      hand: pitchToMidi(note.pitch) >= 60 ? 'right' : 'left',
-      eventIndex: index,
-      startBeat: note.startBeatOffset - measureIndex * BEATS_PER_MEASURE + 1,
-      durationBeats: note.durationBeats,
-      startSeconds: note.startBeatOffset * secondsPerBeat,
-      durationSeconds: note.durationBeats * secondsPerBeat,
-      pitches: [note.pitch],
-      velocity: note.velocity,
-    }
-  })
-}
-
-function pitchToMidi(pitch: string): number {
-  const match = pitch.match(/^([A-G])([#b]?)(\d)$/)
-  if (!match) {
-    return Number.NaN
-  }
-  const semitones = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 } as const
-  const accidental = match[2] === '#' ? 1 : match[2] === 'b' ? -1 : 0
-  return (Number(match[3]) + 1) * 12
-    + semitones[match[1] as keyof typeof semitones]
-    + accidental
 }
 
 function applyPedalSustain(
@@ -149,54 +110,53 @@ export function retimePlaybackSeconds(
   return absoluteBeatOffset * (60 / toBpm)
 }
 
-function buildHandEvents(
+function buildNotationEvents(
   measures: ScoreVersion['measures'],
-  hand: PlaybackHand,
   secondsPerBeat: number,
 ): PlaybackEvent[] {
   const playbackEvents: PlaybackEvent[] = []
   const tiedEventsByPitch = new Map<string, PlaybackEvent>()
 
   measures.forEach((measure, measureIndex) => {
-    const scoreEvents = hand === 'right' ? measure.rightHand : measure.leftHand
+    measure.staves.forEach((staff) => {
+      staff.voices.forEach((voice) => {
+        voice.events.forEach((event, eventIndex) => {
+          const baseEvent = {
+            id: `measure-${measureIndex}-${staff.id}-${voice.id}-${eventIndex}`,
+            measureIndex,
+            staffId: staff.id,
+            voiceId: voice.id,
+            eventIndex,
+            startBeat: event.startBeat,
+            durationBeats: event.durationBeats,
+            startSeconds: (measureIndex * BEATS_PER_MEASURE + event.startBeat - 1) * secondsPerBeat,
+            durationSeconds: event.durationBeats * secondsPerBeat,
+          }
 
-    scoreEvents.forEach((event, eventIndex) => {
-      const baseEvent = {
-        id: `measure-${measureIndex}-${hand}-${eventIndex}`,
-        measureIndex,
-        hand,
-        eventIndex,
-        startBeat: event.startBeat,
-        durationBeats: event.durationBeats,
-        startSeconds: (measureIndex * BEATS_PER_MEASURE + event.startBeat - 1) * secondsPerBeat,
-        durationSeconds: event.durationBeats * secondsPerBeat,
-      }
-      const tiedFromPrevious = new Set(
-        event.tieFromPreviousPitches ?? (event.tieFromPrevious ? event.pitches : []),
-      )
-      const tiedToNext = new Set(
-        event.tieToNextPitches ?? (event.tieToNext ? event.pitches : []),
-      )
+          if (event.notes.length === 0) {
+            playbackEvents.push({ ...baseEvent, pitches: [] })
+          }
 
-      if (event.pitches.length === 0) {
-        playbackEvents.push({ ...baseEvent, pitches: [] })
-      }
+          event.notes.forEach((note) => {
+            const tieKey = `${staff.id}:${note.pitch}`
+            const previous = tiedEventsByPitch.get(tieKey)
+            let current: PlaybackEvent
+            if (note.tieFromPrevious && previous) {
+              previous.durationBeats += event.durationBeats
+              previous.durationSeconds += event.durationBeats * secondsPerBeat
+              current = previous
+            } else {
+              current = { ...baseEvent, pitches: [note.pitch] }
+              playbackEvents.push(current)
+            }
 
-      event.pitches.forEach((pitch) => {
-        const previous = tiedEventsByPitch.get(pitch)
-        if (tiedFromPrevious.has(pitch) && previous) {
-          previous.durationBeats += event.durationBeats
-          previous.durationSeconds += event.durationBeats * secondsPerBeat
-        } else {
-          playbackEvents.push({ ...baseEvent, pitches: [pitch] })
-        }
-
-        const current = playbackEvents.at(-1)!
-        if (tiedToNext.has(pitch)) {
-          tiedEventsByPitch.set(pitch, previous && tiedFromPrevious.has(pitch) ? previous : current)
-        } else {
-          tiedEventsByPitch.delete(pitch)
-        }
+            if (note.tieToNext) {
+              tiedEventsByPitch.set(tieKey, current)
+            } else {
+              tiedEventsByPitch.delete(tieKey)
+            }
+          })
+        })
       })
     })
   })

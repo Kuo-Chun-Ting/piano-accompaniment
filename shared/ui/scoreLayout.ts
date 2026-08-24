@@ -3,7 +3,6 @@ export const SCORE_SYSTEM_LAYOUT = {
   trebleStaveY: 56,
   bassStaveY: 166,
   chordBaselineY: 28,
-  lyricBaselineY: 300,
 } as const
 
 export function getScoreCueX(

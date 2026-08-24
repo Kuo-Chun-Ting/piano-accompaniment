@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<{
   arrangements: ArrangementSet | null
   chart: ConfirmedChart | null
   showVersionSwitcher?: boolean
+  referenceAudioSrc?: string
 }>(), {
   showVersionSwitcher: true,
 })
@@ -209,6 +210,15 @@ function handleExportPdf(): void {
           @update:model-value="handleTempoChange"
         />
 
+        <audio
+          v-if="props.referenceAudioSrc"
+          class="reference-audio"
+          controls
+          preload="metadata"
+          aria-label="Original piano playback"
+          :src="props.referenceAudioSrc"
+        />
+
         <div
           v-if="props.showVersionSwitcher"
           class="version-switcher"
@@ -310,7 +320,7 @@ function handleExportPdf(): void {
   z-index: 5;
   display: grid;
   height: 53px;
-  grid-template-columns: auto minmax(120px, 1fr) auto auto auto;
+  grid-template-columns: auto minmax(120px, 1fr) auto auto minmax(180px, 260px) auto;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid rgba(0,0,0,.09);
@@ -353,6 +363,7 @@ function handleExportPdf(): void {
 .transport button:disabled { color: #aeaeb2; cursor: default; }
 .overall-progress { width: 100%; accent-color: #1d1d1f; }
 time { color: #6e6e73; font-size: .72rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.reference-audio { width: 100%; height: 32px; }
 .blocking,
 .playback-error {
   margin: 0;
@@ -368,6 +379,7 @@ time { color: #6e6e73; font-size: .72rem; font-variant-numeric: tabular-nums; wh
 @media (max-width: 1080px) {
   .score-controls { height: auto; grid-template-columns: auto 1fr auto auto; }
   .score-controls :deep(.tempo-control) { grid-column: 1 / -1; }
+  .reference-audio { grid-column: 1 / -1; }
   .version-switcher { grid-column: 4; grid-row: 1; }
 }
 @media (max-width: 620px) {
