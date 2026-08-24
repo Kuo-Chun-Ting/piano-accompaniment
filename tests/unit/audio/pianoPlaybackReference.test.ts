@@ -38,10 +38,35 @@ test('test_usePianoPlayback_when_reference_mode_plays_seeks_and_changes_tempo_th
   scope.stop()
 })
 
-function installBrowserAudioStub(): void {
+test('test_usePianoPlayback_when_reference_metadata_is_delayed_then_seeks_after_metadata_loads', async () => {
+  // Arrange
+  installBrowserAudioStub({ metadataReady: false })
+  const referenceAudio = ref({
+    src: 'piano.wav',
+    scoreStartSeconds: 8.79,
+    sourceBpm: 120,
+    beatSeconds: [8.79, 9.61, 10.48, 11.29],
+  })
+  const scope = effectScope()
+  const playback = scope.run(() => usePianoPlayback(referenceAudio))!
+  const version = buildVersion()
+
+  // Act
+  await playback.setPlaybackMode('reference', version, 120)
+  const seekPromise = playback.seekPlayback(version, 120, 1)
+  audio?.loadMetadata()
+  await seekPromise
+
+  // Assert
+  expect(audio?.currentTime).toBeCloseTo(10.48)
+  expect(audio?.paused).toBe(false)
+  scope.stop()
+})
+
+function installBrowserAudioStub(options: { metadataReady?: boolean } = {}): void {
   class AudioStub extends FakeAudio {
     constructor(src: string) {
-      super(src)
+      super(src, options.metadataReady ?? true)
       audio = this
     }
   }
@@ -51,13 +76,27 @@ function installBrowserAudioStub(): void {
 }
 
 class FakeAudio {
-  currentTime = 0
+  readyState: number
   playbackRate = 1
   preservesPitch = false
   preload = ''
   paused = true
+  private seconds = 0
+  private readonly listeners = new Map<string, Set<EventListener>>()
 
-  constructor(public src: string) {}
+  constructor(public src: string, metadataReady: boolean) {
+    this.readyState = metadataReady ? 1 : 0
+  }
+
+  get currentTime(): number {
+    return this.seconds
+  }
+
+  set currentTime(value: number) {
+    if (this.readyState >= 1) {
+      this.seconds = value
+    }
+  }
 
   async play(): Promise<void> {
     this.paused = false
@@ -67,8 +106,20 @@ class FakeAudio {
     this.paused = true
   }
 
-  addEventListener(): void {}
-  removeEventListener(): void {}
+  addEventListener(type: string, listener: EventListener): void {
+    const listeners = this.listeners.get(type) ?? new Set<EventListener>()
+    listeners.add(listener)
+    this.listeners.set(type, listeners)
+  }
+
+  removeEventListener(type: string, listener: EventListener): void {
+    this.listeners.get(type)?.delete(listener)
+  }
+
+  loadMetadata(): void {
+    this.readyState = 1
+    this.listeners.get('loadedmetadata')?.forEach((listener) => listener(new Event('loadedmetadata')))
+  }
 }
 
 function buildVersion(): ScoreVersion {

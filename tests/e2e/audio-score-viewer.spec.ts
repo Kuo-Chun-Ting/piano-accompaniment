@@ -176,6 +176,10 @@ test('generated audio score renders and plays with existing controls', async ({ 
   await expect.poll(async () => Number(await progress.inputValue()))
     .toBeGreaterThan(0)
 
+  await page.locator('.system-row').nth(1).click({ position: { x: 300, y: 120 } })
+  await expect.poll(async () => Number(await progress.inputValue()))
+    .toBeGreaterThan(0.2)
+
   await progress.fill('0.5')
   await progress.dispatchEvent('change')
   const referenceState = await page.evaluate(() => {
@@ -239,6 +243,7 @@ async function installAudioMock(page: import('@playwright/test').Page): Promise<
     }
 
     class AudioMock {
+      readyState = 1
       playbackRate = 1
       preservesPitch = false
       preload = ''

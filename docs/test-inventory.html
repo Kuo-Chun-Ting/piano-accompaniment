@@ -38,7 +38,7 @@
     </thead>
     <tbody>
       <tr>
-        <td class="type" rowspan="228">Unit</td>
+        <td class="type" rowspan="229">Unit</td>
         <td class="file" rowspan="11"><code>tests/unit/arrangement/generateArrangement.test.ts</code></td>
         <td class="scope" rowspan="11">輸入 confirmed chart 與 style；預期輸出可播放的伴奏 score、節拍事件、歌詞 cue 與錯誤資訊。</td>
         <td class="count" rowspan="11">11</td>
@@ -454,12 +454,17 @@
         <td class="io">預期回傳目標 BPM／來源 BPM。</td>
       </tr>
       <tr>
-        <td class="file"><code>tests/unit/audio/pianoPlaybackReference.test.ts</code></td>
-        <td class="scope">輸入原曲鋼琴同步資料；預期切換模式、播放、跳轉與改速度時沿用同一條樂譜時間軸。</td>
-        <td class="count">1</td>
+        <td class="file" rowspan="2"><code>tests/unit/audio/pianoPlaybackReference.test.ts</code></td>
+        <td class="scope" rowspan="2">輸入原曲鋼琴同步資料；預期切換模式、播放、跳轉與改速度時沿用同一條樂譜時間軸。</td>
+        <td class="count" rowspan="2">2</td>
         <td class="function"><code>test_usePianoPlayback_when_reference_mode_plays_seeks_and_changes_tempo_then_keeps_shared_timeline</code></td>
         <td class="io">輸入逐拍時間並跳到樂譜第 2 拍、將 120 BPM 改為 96 BPM</td>
         <td class="io">預期原曲跳到對應秒數、倍率為 0.8 且保持音高。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_usePianoPlayback_when_reference_metadata_is_delayed_then_seeks_after_metadata_loads</code></td>
+        <td class="io">首次開啟原曲模式時延遲載入音訊資訊，再跳到樂譜第 2 拍</td>
+        <td class="io">預期載入完成後才設定原曲秒數並開始播放。</td>
       </tr>
       <tr>
         <td class="file" rowspan="6"><code>tests/unit/audio-transcription/cli.test.ts</code></td>
@@ -1601,7 +1606,7 @@
         <td class="count" rowspan="1">1</td>
         <td class="function"><code>generated audio score renders and plays with existing controls</code></td>
         <td class="io">預設輸入含八分音符 beam、跨音延音、踏板、歌詞與多系統的 fixture；可用 AUDIO_SCORE_VIEWER_PATH 改驗真實 MVP 產物</td>
-        <td class="io">預期五線譜、踏板線與歌詞依序分層且至少間隔 8px；沒有符桿溢出、多餘旗標或 page error；來源名稱置中於 Player 下方，Original Piano 可由譜面精確跳至小節內位置，雙模式共用播放鍵、進度跳轉與速度。</td>
+        <td class="io">預期五線譜、踏板線與歌詞依序分層且至少間隔 8px；沒有符桿溢出、多餘旗標或 page error；來源名稱置中於 Player 下方，Original Piano 首次載入後可由前段直接跳至後段小節，雙模式共用播放鍵、進度跳轉與速度。</td>
       </tr>
       <tr>
         <td class="file" rowspan="2"><code>tests/e2e/studio.spec.ts</code></td>

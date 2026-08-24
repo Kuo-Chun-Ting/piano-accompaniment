@@ -153,7 +153,7 @@ export function usePianoPlayback(
 
     try {
       if (mode.value === 'reference') {
-        await startReferencePlayback(version, bpm, startSeconds)
+        await startReferencePlayback(version, bpm, startSeconds, currentRequestId)
         return
       }
 
@@ -174,6 +174,7 @@ export function usePianoPlayback(
     version: ScoreVersion,
     bpm: number,
     requestedStartSeconds: number,
+    currentRequestId: number,
   ): Promise<void> {
     const audio = toValue(referenceAudio)
     if (!audio) {
@@ -193,6 +194,12 @@ export function usePianoPlayback(
     referencePlayer.preload = 'auto'
     referencePlayer.preservesPitch = true
     referencePlayer.playbackRate = getReferenceAudioPlaybackRate(audio.sourceBpm, bpm)
+    await waitForAudioMetadata(referencePlayer)
+
+    if (currentRequestId !== requestId) {
+      return
+    }
+
     referencePlayer.currentTime = getReferenceAudioSeconds(
       audio,
       playbackOffsetSeconds / schedule.secondsPerBeat,
@@ -417,6 +424,30 @@ export function usePianoPlayback(
     setPlaybackMode,
     stopPlayback,
   }
+}
+
+function waitForAudioMetadata(audio: HTMLAudioElement): Promise<void> {
+  if (audio.readyState >= 1) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve, reject) => {
+    const handleLoadedMetadata = () => {
+      cleanup()
+      resolve()
+    }
+    const handleError = () => {
+      cleanup()
+      reject(new Error('Reference piano audio metadata failed to load.'))
+    }
+    const cleanup = () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      audio.removeEventListener('error', handleError)
+    }
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+    audio.addEventListener('error', handleError)
+  })
 }
 
 async function loadSampleBuffers(audioContext: AudioContext): Promise<Map<string, AudioBuffer>> {
