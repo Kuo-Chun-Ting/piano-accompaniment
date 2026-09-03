@@ -4,6 +4,10 @@ from pathlib import Path
 from collections.abc import Iterable
 from typing import Protocol
 
+import onnxruntime
+
+onnxruntime.disable_telemetry_events()
+
 from faster_whisper import WhisperModel
 from opencc import OpenCC
 

@@ -6,6 +6,10 @@ import { performance } from 'node:perf_hooks'
 import { parseAudioScoreArgs } from '../shared/audio-transcription/cli'
 import { convertTranscriptionToScore } from '../shared/audio-transcription/midiToScore'
 import {
+  cleanTranscribedNotes,
+  parsePitchEnergyFile,
+} from '../shared/audio-transcription/onsetCleaning'
+import {
   buildAudioScorePipeline,
   resolveAudioScorePaths,
   type PipelineCommand,
@@ -96,11 +100,23 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
 
   await copyFile(paths.pianoStem, paths.pianoAudio)
   const notesFile = parseMidiNotes(await readJson(paths.notes))
+  const cleanedTranscription = cleanTranscribedNotes(
+    notesFile.notes,
+    parsePitchEnergyFile(await readJson(paths.pitchEnergy)),
+  )
+  const cleanedNotesFile = {
+    ...notesFile,
+    notes: cleanedTranscription.notes,
+    cleaning: {
+      rejectedGroups: cleanedTranscription.rejectedGroups,
+    },
+  }
+  await writeJson(paths.cleanedNotes, cleanedNotesFile)
   const structureFile = parseStructure(await readJson(paths.structure))
   const lyricsFile = parseLyrics(await readJson(paths.lyrics))
   const firstDownbeatSeconds = structureFile.downbeats[0] ?? structureFile.beats[0] ?? 0
   const version = convertTranscriptionToScore({
-    notes: notesFile.notes,
+    notes: cleanedNotesFile.notes,
     pedalEvents: notesFile.pedalEvents,
     lyricSegments: lyricsFile.segments,
     bpm: structureFile.bpm,
@@ -148,6 +164,8 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
     downbeats: structureFile.downbeats.length,
     measures: version.measures.length,
     midiNotes: notesFile.notes.length,
+    renderedMidiNotes: cleanedNotesFile.notes.length,
+    rejectedOnsetGroups: cleanedTranscription.rejectedGroups.length,
     pedalEvents: notesFile.pedalEvents.length,
     pedalIntervals: version.pedalIntervals?.length ?? 0,
     lyricLanguage: lyricsFile.language,

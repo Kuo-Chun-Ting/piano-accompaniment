@@ -55,7 +55,7 @@ async function verifyCase(testCase: VerificationCase) {
     hashDecodedAudio(resolve(projectDirectory, testCase.referenceAudio)),
     hashDecodedAudio(resolve(outputDirectory, 'piano.wav')),
     readJson<ScoreFile>(resolve(outputDirectory, 'score.json')),
-    readJson<MidiNotesFile>(resolve(outputDirectory, 'work', 'notes.json')),
+    readJson<MidiNotesFile>(resolve(outputDirectory, 'work', 'cleaned-notes.json')),
     readJson<StructureFile>(resolve(outputDirectory, 'work', 'structure', 'normalized.json')),
   ])
   const originSeconds = structure.downbeats[0] ?? structure.beats[0] ?? 0

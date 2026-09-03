@@ -20,6 +20,7 @@ test('test_transcribeLyrics_when_model_returns_segments_then_writes_timed_lyrics
   const modelCache = join(directory, 'models')
   mkdirSync(stubDirectory)
   writeFileSync(inputPath, 'fixture')
+  writeFileSync(join(stubDirectory, 'onnxruntime.py'), buildOnnxRuntimeStub())
   writeFileSync(join(stubDirectory, 'faster_whisper.py'), buildFasterWhisperStub())
   writeFileSync(join(stubDirectory, 'opencc.py'), buildOpenCcStub())
 
@@ -44,6 +45,36 @@ test('test_transcribeLyrics_when_model_returns_segments_then_writes_timed_lyrics
       text: '只剩下鋼琴陪我談了一天',
     }],
   })
+})
+
+test('test_transcribeLyrics_when_starting_model_then_disables_onnx_telemetry_first', () => {
+  // Arrange
+  const directory = createTemporaryDirectory()
+  const stubDirectory = join(directory, 'stubs')
+  const inputPath = join(directory, 'vocals.wav')
+  const outputPath = join(directory, 'lyrics.json')
+  mkdirSync(stubDirectory)
+  writeFileSync(inputPath, 'fixture')
+  writeFileSync(join(stubDirectory, 'onnxruntime.py'), buildOnnxRuntimeStub())
+  writeFileSync(
+    join(stubDirectory, 'faster_whisper.py'),
+    buildTelemetryAwareFasterWhisperStub(),
+  )
+  writeFileSync(join(stubDirectory, 'opencc.py'), buildOpenCcStub())
+
+  // Act
+  execFileSync('python3', [
+    resolve('scripts/audio-score/transcribe-lyrics.py'),
+    '--input', inputPath,
+    '--output', outputPath,
+    '--model', 'turbo',
+    '--model-cache', join(directory, 'models'),
+  ], {
+    env: { ...process.env, PYTHONPATH: stubDirectory },
+  })
+
+  // Assert
+  expect(JSON.parse(readFileSync(outputPath, 'utf8')).segments).toEqual([])
 })
 
 function createTemporaryDirectory(): string {
@@ -86,6 +117,33 @@ class WhisperModel:
             Segment(8.25, 10.5, " 只剩下钢琴陪我谈了一天 ", 0.05),
             Segment(11.0, 12.0, "不該出現", 0.95),
         ]), Info()
+`
+}
+
+function buildOnnxRuntimeStub(): string {
+  return `
+telemetry_disabled = False
+
+def disable_telemetry_events():
+    global telemetry_disabled
+    telemetry_disabled = True
+`
+}
+
+function buildTelemetryAwareFasterWhisperStub(): string {
+  return `
+import onnxruntime
+
+class Info:
+    language = "zh"
+    language_probability = 0.98
+
+class WhisperModel:
+    def __init__(self, *args, **kwargs):
+        assert onnxruntime.telemetry_disabled
+
+    def transcribe(self, input_path, **options):
+        return iter([]), Info()
 `
 }
 

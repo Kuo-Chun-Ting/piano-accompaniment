@@ -27,6 +27,8 @@ describe('audioScorePipeline', () => {
       demixDirectory: '/tmp/My Score Output/work/allinone-demix',
       spectrogramDirectory: '/tmp/My Score Output/work/allinone-spec',
       notes: '/tmp/My Score Output/work/notes.json',
+      pitchEnergy: '/tmp/My Score Output/work/pitch-energy.json',
+      cleanedNotes: '/tmp/My Score Output/work/cleaned-notes.json',
       lyrics: '/tmp/My Score Output/work/lyrics.json',
       pianoAudio: '/tmp/My Score Output/piano.wav',
       score: '/tmp/My Score Output/score.json',
@@ -57,6 +59,7 @@ describe('audioScorePipeline', () => {
       'transcribe-midi',
       'analyze-structure',
       'export-midi-notes',
+      'export-pitch-energy',
       'transcribe-lyrics',
     ])
     expect(commands[0]).toMatchObject({
@@ -93,6 +96,18 @@ describe('audioScorePipeline', () => {
       ],
     })
     expect(commands[5]).toMatchObject({
+      executable: '/tmp/audio venv/bin/python',
+      args: [
+        '/project root/scripts/audio-score/export-pitch-energy.py',
+        '--input',
+        '/tmp/My Score Output/work/stems/normalized_piano.wav',
+        '--output',
+        '/tmp/My Score Output/work/pitch-energy.json',
+        '--notes',
+        '/tmp/My Score Output/work/notes.json',
+      ],
+    })
+    expect(commands[6]).toMatchObject({
       executable: '/tmp/audio venv/bin/python',
       args: [
         '/project root/scripts/audio-score/transcribe-lyrics.py',

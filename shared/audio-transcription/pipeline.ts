@@ -14,6 +14,8 @@ export type AudioScorePaths = {
   demixDirectory: string
   spectrogramDirectory: string
   notes: string
+  pitchEnergy: string
+  cleanedNotes: string
   lyrics: string
   pianoAudio: string
   score: string
@@ -59,6 +61,8 @@ export function resolveAudioScorePaths(outputDirectory: string): AudioScorePaths
     demixDirectory: join(workDirectory, 'allinone-demix'),
     spectrogramDirectory: join(workDirectory, 'allinone-spec'),
     notes: join(workDirectory, 'notes.json'),
+    pitchEnergy: join(workDirectory, 'pitch-energy.json'),
+    cleanedNotes: join(workDirectory, 'cleaned-notes.json'),
     lyrics: join(workDirectory, 'lyrics.json'),
     pianoAudio: join(outputDirectory, 'piano.wav'),
     score: join(outputDirectory, 'score.json'),
@@ -147,6 +151,19 @@ export function buildAudioScorePipeline(config: AudioScorePipelineConfig): Pipel
         '--input',
         paths.midi,
         '--output',
+        paths.notes,
+      ],
+    },
+    {
+      stage: 'export-pitch-energy',
+      executable: config.pythonExecutable,
+      args: [
+        join(config.projectDirectory, 'scripts/audio-score/export-pitch-energy.py'),
+        '--input',
+        paths.pianoStem,
+        '--output',
+        paths.pitchEnergy,
+        '--notes',
         paths.notes,
       ],
     },

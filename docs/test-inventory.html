@@ -343,6 +343,54 @@
         <td class="io">預期接受錄音中實際出現的 16 半音上限。</td>
       </tr>
       <tr>
+        <td class="file" rowspan="9"><code>tests/unit/audio-transcription/onsetEvidence.test.ts</code></td>
+        <td class="scope" rowspan="9">輸入單一 pitch 的頻帶能量取樣與候選擊鍵時間；預期以基準窗趨勢、離散度與敲擊形狀判定候選是真實擊鍵、延音或證據不足。</td>
+        <td class="count" rowspan="9">9</td>
+        <td class="function"><code>test_evaluateOnsetEvidence_when_pitch_only_decays_then_rejects_candidate</code></td>
+        <td class="io">輸入持續衰減、沒有新瞬態的能量序列</td>
+        <td class="io">預期判定為延音而非新擊鍵。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_evaluateOnsetEvidence_when_pitch_is_struck_again_then_confirms_candidate</code></td>
+        <td class="io">輸入衰減中出現三倍能量躍升的序列</td>
+        <td class="io">預期判定為真實重擊。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_evaluateOnsetEvidence_when_rise_is_close_to_local_fluctuation_then_reports_uncertain</code></td>
+        <td class="io">輸入上升幅度接近自身正常起伏的序列</td>
+        <td class="io">預期判定為證據不足並保留候選。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_evaluateOnsetEvidence_when_baseline_excludes_previous_attack_then_confirms_fast_restrike</code></td>
+        <td class="io">輸入前一次擊鍵瞬態緊鄰候選的序列</td>
+        <td class="io">預期基準窗跳過前一次瞬態，快速重擊仍被判定為真。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_evaluateOnsetEvidence_when_baseline_window_is_too_short_then_reports_uncertain</code></td>
+        <td class="io">輸入基準窗不足最小取樣數的序列</td>
+        <td class="io">預期不做判定並保留候選。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_evaluateOnsetEvidence_when_pitch_is_below_noise_floor_then_confirms_candidate</code></td>
+        <td class="io">輸入候選前能量低於噪音底的序列</td>
+        <td class="io">預期視為新音而非延續，保留擊鍵。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_evaluateOnsetEvidence_when_energy_is_ambiguous_but_window_has_no_fast_rise_then_rejects_candidate</code></td>
+        <td class="io">輸入能量殘差落在不確定區、但窗內只有緩慢平台的序列</td>
+        <td class="io">預期以敲擊形狀判定為延音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_evaluateOnsetEvidence_when_energy_is_ambiguous_but_window_has_fast_rise_then_confirms_candidate</code></td>
+        <td class="io">輸入能量殘差落在不確定區、但窗內出現快速上升的序列</td>
+        <td class="io">預期以敲擊形狀判定為真實擊鍵。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_evaluateOnsetEvidence_when_candidate_is_evaluated_then_reports_traceable_measurements</code></td>
+        <td class="io">輸入一般候選擊鍵</td>
+        <td class="io">預期輸出基準窗範圍、趨勢預測、離散度與 evidence score 供追查。</td>
+      </tr>
+      <tr>
         <td class="file"><code>tests/unit/audio-transcription/exportMidiNotes.test.ts</code></td>
         <td class="scope">執行真實 Python 匯出腳本並隔離 mido；預期 MIDI CC64 不會在 JSON 邊界遺失。</td>
         <td class="count">1</td>
@@ -351,8 +399,51 @@
         <td class="io">預期 notes.json 保留踏板時間與原始數值。</td>
       </tr>
       <tr>
+        <td class="file" rowspan="8"><code>tests/unit/audio-transcription/onsetCleaning.test.ts</code></td>
+        <td class="scope" rowspan="8">輸入 MIDI 候選音與 per-pitch 能量；預期只合併沒有新敲擊證據的重複和弦，並優先避免漏音。</td>
+        <td class="count" rowspan="8">8</td>
+        <td class="function"><code>test_cleanTranscribedNotes_when_repeated_chord_has_no_new_attack_then_merges_into_previous_notes</code></td>
+        <td class="io">輸入相同和弦與持續衰減能量</td>
+        <td class="io">預期移除假重擊並延長原音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_cleanTranscribedNotes_when_rejected_groups_are_consecutive_then_keeps_original_anchor</code></td>
+        <td class="io">輸入連續兩組假重擊</td>
+        <td class="io">預期都合併至原始確認音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_cleanTranscribedNotes_when_one_chord_pitch_has_new_attack_then_keeps_whole_group</code></td>
+        <td class="io">輸入和弦中一音具有新敲擊</td>
+        <td class="io">預期保留整組，避免漏音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_cleanTranscribedNotes_when_single_pitch_lacks_attack_evidence_then_preserves_note</code></td>
+        <td class="io">輸入單音且敲擊證據不足</td>
+        <td class="io">預期保留候選音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_cleanTranscribedNotes_when_repeated_group_is_subset_of_sounding_chord_then_merges_only_repeated_pitches</code></td>
+        <td class="io">輸入前一和弦的部分重複音</td>
+        <td class="io">預期只延長重複音，不改動其他音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_cleanTranscribedNotes_when_harmonic_like_rise_confirms_one_pitch_then_preserves_group</code></td>
+        <td class="io">輸入可能為泛音的局部能量上升</td>
+        <td class="io">預期保留整組，優先避免漏音。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parsePitchEnergyFile_when_export_is_valid_then_attaches_shared_timing_to_each_pitch</code></td>
+        <td class="io">輸入有效 Python 能量 JSON</td>
+        <td class="io">預期轉成逐音高的時間取樣。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parsePitchEnergyFile_when_export_contains_invalid_values_then_throws</code></td>
+        <td class="io">輸入含無效數值的能量 JSON</td>
+        <td class="io">預期拒絕無法判讀的輸入。</td>
+      </tr>
+      <tr>
         <td class="file" rowspan="2"><code>tests/unit/audio-transcription/pipeline.test.ts</code></td>
-        <td class="scope" rowspan="2">輸入音訊、輸出、Python、模型與專案路徑；預期輸出固定產物配置，以及鋼琴與歌詞辨識命令。</td>
+        <td class="scope" rowspan="2">輸入音訊、輸出、Python、模型與專案路徑；預期輸出固定產物配置，以及鋼琴、逐音高能量與歌詞命令。</td>
         <td class="count" rowspan="2">2</td>
         <td class="function"><code>test_resolveAudioScorePaths_when_output_has_spaces_then_returns_deterministic_layout</code></td>
         <td class="io">輸入含空白的輸出目錄</td>
@@ -361,15 +452,20 @@
       <tr>
         <td class="function"><code>test_buildAudioScorePipeline_when_paths_have_spaces_then_preserves_argument_boundaries</code></td>
         <td class="io">輸入含空白的 WAV、Python、模型與專案路徑</td>
-        <td class="io">預期六階段命令保留獨立參數，並把 Whisper、CA、Hugging Face 與 Torch 快取固定在內部 runtime。</td>
+        <td class="io">預期七階段命令保留獨立參數，並把 Whisper、CA、Hugging Face 與 Torch 快取固定在內部 runtime。</td>
       </tr>
       <tr>
-        <td class="file"><code>tests/unit/audio-transcription/transcribeLyrics.test.ts</code></td>
-        <td class="scope">執行真實 Python 歌詞腳本並隔離 faster-whisper 與 OpenCC；預期輸出有效繁體中文句子時間並排除無人聲片段。</td>
-        <td class="count">1</td>
+        <td class="file" rowspan="2"><code>tests/unit/audio-transcription/transcribeLyrics.test.ts</code></td>
+        <td class="scope" rowspan="2">執行真實 Python 歌詞腳本並隔離 ONNX Runtime、faster-whisper 與 OpenCC；預期先停用 telemetry，再輸出有效繁體中文句子時間並排除無人聲片段。</td>
+        <td class="count" rowspan="2">2</td>
         <td class="function"><code>test_transcribeLyrics_when_model_returns_segments_then_writes_timed_lyrics</code></td>
         <td class="io">輸入一段有效歌詞與一段高 no-speech 機率結果</td>
         <td class="io">預期 JSON 只保留轉為繁體中文的有效歌詞與時間。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_transcribeLyrics_when_starting_model_then_disables_onnx_telemetry_first</code></td>
+        <td class="io">啟動歌詞模型</td>
+        <td class="io">預期建立 WhisperModel 前已停用 ONNX telemetry。</td>
       </tr>
       <tr>
         <td class="file"><code>tests/unit/audio-transcription/runtime.test.ts</code></td>
