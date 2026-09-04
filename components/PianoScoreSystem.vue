@@ -105,7 +105,6 @@ function renderSystem(): void {
       trebleStaff,
       bassStaff,
       measureWidth,
-      measureIndex === 0,
     )
     drawChordSymbols(context, treble, trebleStaff, measureWidth, x)
 
@@ -228,7 +227,6 @@ function drawGrandStaffVoices(
   trebleStaff: ScoreStaff,
   bassStaff: ScoreStaff,
   staveWidth: number,
-  isFirstMeasure: boolean,
 ): { trebleVoices: RenderedVoice[], bassVoices: RenderedVoice[] } {
   const trebleVoices = buildRenderedVoices(trebleStaff)
   const bassVoices = buildRenderedVoices(bassStaff)
@@ -238,7 +236,9 @@ function drawGrandStaffVoices(
   const formatter = new Formatter()
     .joinVoices(trebleVoices.map(voice => voice.voice))
     .joinVoices(bassVoices.map(voice => voice.voice))
-  const formattingWidth = Math.max(staveWidth - (isFirstMeasure ? 90 : 28), 100)
+  const noteStartX = Math.max(treble.getNoteStartX(), bass.getNoteStartX())
+  const noteEndX = treble.getX() + staveWidth - 16
+  const formattingWidth = Math.max(noteEndX - noteStartX, 100)
   formatter.format(voices, formattingWidth)
 
   trebleVoices.forEach(voice => drawRenderedVoice(context, treble, voice))

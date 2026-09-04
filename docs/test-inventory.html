@@ -38,7 +38,7 @@
     </thead>
     <tbody>
       <tr>
-        <td class="type" rowspan="229">Unit</td>
+        <td class="type" rowspan="234">Unit</td>
         <td class="file" rowspan="11"><code>tests/unit/arrangement/generateArrangement.test.ts</code></td>
         <td class="scope" rowspan="11">輸入 confirmed chart 與 style；預期輸出可播放的伴奏 score、節拍事件、歌詞 cue 與錯誤資訊。</td>
         <td class="count" rowspan="11">11</td>
@@ -453,6 +453,34 @@
         <td class="function"><code>test_buildAudioScorePipeline_when_paths_have_spaces_then_preserves_argument_boundaries</code></td>
         <td class="io">輸入含空白的 WAV、Python、模型與專案路徑</td>
         <td class="io">預期七階段命令保留獨立參數，並把 Whisper、CA、Hugging Face 與 Torch 快取固定在內部 runtime。</td>
+      </tr>
+      <tr>
+        <td class="file" rowspan="5"><code>tests/unit/audio-transcription/sustainInference.test.ts</code></td>
+        <td class="scope" rowspan="5">輸入候選音、模型踏板與逐音高能量；預期只補足有多音持續共鳴證據的踏板區段，並保留模型踏板。</td>
+        <td class="count" rowspan="5">5</td>
+        <td class="function"><code>test_inferSustainPedalEvents_when_chord_keeps_sounding_across_next_attack_then_adds_pedal_interval</code></td>
+        <td class="io">輸入跨越下一次擊鍵仍有能量的和弦</td>
+        <td class="io">預期補上踏板區段。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_inferSustainPedalEvents_when_pitch_energy_has_died_before_next_attack_then_does_not_add_pedal</code></td>
+        <td class="io">輸入已衰減的候選和弦</td>
+        <td class="io">預期不推測踏板。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_inferSustainPedalEvents_when_only_one_note_crosses_next_attack_then_does_not_guess_pedal</code></td>
+        <td class="io">輸入只有一音持續的候選</td>
+        <td class="io">預期不把單音延長誤判成踏板。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_inferSustainPedalEvents_when_next_chord_starts_before_resonance_ends_then_refreshes_pedal_at_chord</code></td>
+        <td class="io">輸入共鳴尚未結束但新和弦已開始的候選</td>
+        <td class="io">預期在新和弦處換踏板。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_mergePedalEvents_when_detected_and_inferred_intervals_overlap_then_returns_one_interval</code></td>
+        <td class="io">輸入相互重疊的模型踏板與推論踏板</td>
+        <td class="io">預期模型踏板保持原樣，推論只補未覆蓋區段。</td>
       </tr>
       <tr>
         <td class="file" rowspan="2"><code>tests/unit/audio-transcription/transcribeLyrics.test.ts</code></td>
@@ -1702,7 +1730,7 @@
         <td class="count" rowspan="1">1</td>
         <td class="function"><code>generated audio score renders and plays with existing controls</code></td>
         <td class="io">預設輸入含八分音符 beam、跨音延音、踏板、歌詞與多系統的 fixture；可用 AUDIO_SCORE_VIEWER_PATH 改驗真實 MVP 產物</td>
-        <td class="io">預期五線譜、踏板線與歌詞依序分層且至少間隔 8px；沒有符桿溢出、多餘旗標或 page error；來源名稱置中於 Player 下方，Original Piano 首次載入後可由前段直接跳至後段小節，雙模式共用播放鍵、進度跳轉與速度。</td>
+        <td class="io">預期五線譜、踏板線與歌詞依序分層且至少間隔 8px；音符與內部小節線至少間隔 8px；沒有符桿溢出、多餘旗標或 page error；來源名稱置中於 Player 下方，Original Piano 首次載入後可由前段直接跳至後段小節，雙模式共用播放鍵、進度跳轉與速度。</td>
       </tr>
       <tr>
         <td class="file" rowspan="2"><code>tests/e2e/studio.spec.ts</code></td>

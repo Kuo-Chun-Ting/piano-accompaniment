@@ -78,7 +78,15 @@ Run the MVP with one WAV path:
 npm run audio:score -- "/absolute/path/to/recording.wav"
 ```
 
-The command creates or overwrites `.audio-score/<recording-name>/` beside the WAV file. Open its `index.html` to view and play the score.
+The command creates or overwrites `.audio-score/<recording-name>/` beside the WAV file.
+
+Serve the project directory to view and play generated scores:
+
+```bash
+python3 -m http.server 3200 --bind 127.0.0.1
+```
+
+Open `http://127.0.0.1:3200/.audio-score/<recording-name>/index.html`.
 
 Project samples:
 

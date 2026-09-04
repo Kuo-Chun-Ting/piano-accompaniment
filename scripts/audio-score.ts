@@ -10,6 +10,10 @@ import {
   parsePitchEnergyFile,
 } from '../shared/audio-transcription/onsetCleaning'
 import {
+  inferSustainPedalEvents,
+  mergePedalEvents,
+} from '../shared/audio-transcription/sustainInference'
+import {
   buildAudioScorePipeline,
   resolveAudioScorePaths,
   type PipelineCommand,
@@ -100,15 +104,20 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
 
   await copyFile(paths.pianoStem, paths.pianoAudio)
   const notesFile = parseMidiNotes(await readJson(paths.notes))
+  const pitchEnergy = parsePitchEnergyFile(await readJson(paths.pitchEnergy))
   const cleanedTranscription = cleanTranscribedNotes(
     notesFile.notes,
-    parsePitchEnergyFile(await readJson(paths.pitchEnergy)),
+    pitchEnergy,
   )
+  const inferredPedalEvents = inferSustainPedalEvents(cleanedTranscription.notes, pitchEnergy)
+  const pedalEvents = mergePedalEvents(notesFile.pedalEvents, inferredPedalEvents)
   const cleanedNotesFile = {
     ...notesFile,
     notes: cleanedTranscription.notes,
+    pedalEvents,
     cleaning: {
       rejectedGroups: cleanedTranscription.rejectedGroups,
+      inferredPedalEvents,
     },
   }
   await writeJson(paths.cleanedNotes, cleanedNotesFile)
@@ -117,7 +126,7 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
   const firstDownbeatSeconds = structureFile.downbeats[0] ?? structureFile.beats[0] ?? 0
   const version = convertTranscriptionToScore({
     notes: cleanedNotesFile.notes,
-    pedalEvents: notesFile.pedalEvents,
+    pedalEvents,
     lyricSegments: lyricsFile.segments,
     bpm: structureFile.bpm,
     durationSeconds: notesFile.durationSeconds,
@@ -166,7 +175,9 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
     midiNotes: notesFile.notes.length,
     renderedMidiNotes: cleanedNotesFile.notes.length,
     rejectedOnsetGroups: cleanedTranscription.rejectedGroups.length,
-    pedalEvents: notesFile.pedalEvents.length,
+    detectedPedalEvents: notesFile.pedalEvents.length,
+    inferredPedalEvents: inferredPedalEvents.length,
+    pedalEvents: pedalEvents.length,
     pedalIntervals: version.pedalIntervals?.length ?? 0,
     lyricLanguage: lyricsFile.language,
     lyricLanguageProbability: lyricsFile.languageProbability,

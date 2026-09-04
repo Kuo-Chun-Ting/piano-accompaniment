@@ -77,6 +77,31 @@ test('generated audio score renders and plays with existing controls', async ({ 
     oversizedStems: 0,
   })))
 
+  const barlineClearances = await page.locator('.score-system svg').evaluateAll(svgs => svgs.map((svg) => {
+    const barlineXs = [...new Set([...svg.querySelectorAll<SVGGraphicsElement>('.vf-stavebarline')]
+      .map(barline => barline.getBBox().x))]
+      .sort((left, right) => left - right)
+    const internalBarlineXs = barlineXs.slice(1, -1)
+    const noteBoxes = [...svg.querySelectorAll<SVGGraphicsElement>('.vf-stavenote')]
+      .map(note => note.getBBox())
+
+    return internalBarlineXs.map(barlineX => Math.min(...noteBoxes.map((note) => {
+      const noteRight = note.x + note.width
+      if (noteRight <= barlineX) {
+        return barlineX - noteRight
+      }
+      if (note.x >= barlineX) {
+        return note.x - barlineX
+      }
+      return -Math.min(barlineX - note.x, noteRight - barlineX)
+    })))
+  }))
+  for (const clearances of barlineClearances) {
+    for (const clearance of clearances) {
+      expect(clearance).toBeGreaterThanOrEqual(8)
+    }
+  }
+
   const contentLayers = await page.locator('.score-system svg').evaluateAll(svgs => svgs.map((svg) => {
     const getBox = (selector: string) => {
       const elements = [...svg.querySelectorAll<SVGGraphicsElement>(selector)]
