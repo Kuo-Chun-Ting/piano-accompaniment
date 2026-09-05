@@ -12,10 +12,11 @@ The goal is to let users name a song, describe the accompaniment they want in na
 
 ## Current MVP
 
-The current MVP starts from chord-sheet images. AI extracts the song structure, chords, beat durations, and lyrics; the user corrects the result before the application generates a simple piano accompaniment score.
+Use **Audio File** on the homepage to transcribe WAV recordings into piano scores. **Chord Sheet Image** is temporarily disabled; its implementation is retained.
 
 ## Features
 
+- Upload a WAV recording, follow transcription progress, and play the result as Score or Original Piano with tempo control and seeking.
 - Upload one or more chord-sheet images and choose an OpenAI model for chart extraction.
 - Review and edit chords, beat durations, lyrics, and measures before generating a score.
 - Add, delete, and reorder chords or measures with undo and redo support.
@@ -26,14 +27,18 @@ The current MVP starts from chord-sheet images. AI extracts the song structure, 
 
 ```mermaid
 flowchart LR
-    User[User] -->|Upload chord-sheet images| App[Nuxt application]
+    User[User] --> App[Nuxt application]
+    App -->|WAV upload| Job[Local transcription job]
+    Job -->|Existing Python models + TypeScript pipeline| AudioScore[Score data + piano WAV]
+    AudioScore --> Score[VexFlow score]
+    AudioScore --> Playback[Shared player]
     App -->|Images and selected model| API[Nuxt server API]
     API -->|Structured extraction request| OpenAI[OpenAI Responses API]
     OpenAI -->|Validated chart data| App
     App --> Editor[Editable chord chart]
     Editor --> Arrangement[Arrangement engine]
     Arrangement --> Score[VexFlow score]
-    Arrangement --> Playback[Web Audio playback]
+    Arrangement --> Playback
 ```
 
 The server sends uploaded images to the OpenAI Responses API and validates the structured result with Zod. The browser editor is the source of truth after extraction, so users can correct recognition errors before arrangement generation. The arrangement engine converts confirmed four-beat measures into deterministic piano events used by both score rendering and playback.
@@ -68,7 +73,13 @@ Start the development server:
 npm run dev
 ```
 
-Open the local URL shown by Nuxt. The analysis model is selected in the application.
+Open the local URL shown by Nuxt. Click the upload area or drop a WAV (up to 100 MB), then select **Create Score**. Click or drop again to replace the file; use × to remove it. The image workflow is currently unavailable.
+
+Audio transcription runs on the Node server using the existing local Python/model installation and `ffmpeg`, just like `npm run audio:score`. An OpenAI key is needed only for image extraction. This is a local, single-server MVP—not a serverless or authenticated public service. Run commands from the project root, with development dependencies installed.
+
+Only one recording is processed at a time. Refreshing the browser reconnects to the job while the server remains running. Cancelling stops that job's model processes; restarting the server stops active jobs and clears its job list. Uploaded recordings, generated files, and `pipeline.log` are stored under `.data/audio-scores/<job-id>/` (ignored by Git; no automatic deletion).
+
+The website serves its own audio with byte-range support. It does **not** need the separate preview server below.
 
 ## Audio-to-score MVP
 

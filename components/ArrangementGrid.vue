@@ -481,14 +481,16 @@ time { color: #6e6e73; font-size: .72rem; font-variant-numeric: tabular-nums; wh
 }
 @media (max-width: 620px) {
   .score-workspace.ready {
-    height: auto;
-    min-height: 720px;
+    height: 100%;
+    min-height: 0;
     grid-template-rows: 52px auto minmax(0, 1fr);
   }
   .score-controls { height: auto; grid-template-columns: minmax(0, 1fr) auto; }
-  .version-switcher { grid-column: 1 / -1; grid-row: auto; }
-  .transport .stop { display: none; }
-  .score-stage { height: auto; max-height: 720px; padding: 12px; }
+  .player-controls { grid-column: 1 / -1; grid-template-columns: auto minmax(64px, 1fr) auto; }
+  .overall-progress { min-width: 0; margin: 0; }
+  .score-controls :deep(.tempo-control) { grid-column: 1; grid-row: 2; justify-self: start; }
+  .version-switcher { grid-column: 2; grid-row: 2; justify-self: end; }
+  .score-stage { padding: 12px; }
 }
 </style>
 

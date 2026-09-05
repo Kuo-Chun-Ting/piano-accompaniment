@@ -24,17 +24,24 @@ beforeEach(() => {
   mockUseChartWorkspace.mockReturnValue(workspace)
 })
 
-test('test_StudioPage_when_chart_is_unavailable_then_renders_upload_workspace', async () => {
+test('test_StudioPage_when_opened_then_uses_english_and_blocks_image_entry', async () => {
   // Arrange & Act
   const wrapper = await mountStudioPage()
 
   // Assert
-  expect(wrapper.findComponent({ name: 'UploadPanel' }).exists()).toBe(true)
+  expect(wrapper.findComponent({ name: 'AudioScoreWorkspace' }).exists()).toBe(true)
+  expect(wrapper.get('.source-heading h1').text()).toBe('Create Piano Score')
+  expect(wrapper.get('[aria-label="Input source"] button:first-child').text()).toBe('Audio File')
+  const images = wrapper.get('[aria-label="Input source"] button:last-child')
+  expect(images.text()).toBe('Chord Sheet Image')
+  expect(images.attributes('disabled')).toBeDefined()
+  await images.trigger('click')
+  expect(wrapper.findComponent({ name: 'UploadPanel' }).exists()).toBe(false)
   expect(wrapper.find('[aria-label="Workspace view"]').exists()).toBe(false)
   expect(wrapper.find('[data-test="chart-comparison"]').exists()).toBe(false)
 })
 
-test('test_StudioPage_when_chart_has_no_score_then_renders_chart_and_disables_score_view', async () => {
+test('test_StudioPage_when_saved_chart_exists_then_keeps_image_workspace_locked', async () => {
   // Arrange
   workspace.extractedChart.value = structuredClone(extractedChartFixture)
 
@@ -42,36 +49,30 @@ test('test_StudioPage_when_chart_has_no_score_then_renders_chart_and_disables_sc
   const wrapper = await mountStudioPage()
 
   // Assert
-  expect(wrapper.get('h2').text()).toBe('Fixture Song')
-  expect(wrapper.get('[data-test="chart-comparison"]').isVisible()).toBe(true)
-  expect(wrapper.get('[aria-label="Workspace view"] button:last-child').attributes('disabled')).toBe('')
+  expect(wrapper.find('[data-test="chart-comparison"]').exists()).toBe(false)
+  expect(wrapper.find('[aria-label="Workspace view"]').exists()).toBe(false)
+  expect(wrapper.get('[aria-label="Input source"] button:first-child').attributes('aria-pressed')).toBe('true')
 })
 
-test('test_StudioPage_when_chart_is_confirmed_then_switches_to_score_view', async () => {
+test('test_StudioPage_when_saved_score_exists_then_keeps_image_workspace_locked', async () => {
   // Arrange
   workspace.extractedChart.value = structuredClone(extractedChartFixture)
-  workspace.confirmChart.mockImplementation(() => {
-    workspace.confirmedChart.value = buildConfirmedChart()
-    workspace.arrangements.value = buildArrangementSet()
-  })
+  workspace.confirmedChart.value = buildConfirmedChart()
+  workspace.arrangements.value = buildArrangementSet()
+  // Act
   const wrapper = await mountStudioPage()
 
-  // Act
-  await wrapper.get('[data-test="confirm-chart"]').trigger('click')
-
   // Assert
-  expect(workspace.confirmChart).toHaveBeenCalledWith(expect.objectContaining({
-    normalizedKey: 'C',
-    mood: 'spacious-ballad',
-  }))
-  expect(wrapper.get('[aria-label="Workspace view"] button:last-child').classes()).toContain('active')
-  expect(wrapper.get('[data-test="arrangement-grid"]').isVisible()).toBe(true)
+  expect(wrapper.find('[data-test="arrangement-grid"]').exists()).toBe(false)
+  expect(wrapper.find('[aria-label="Workspace view"]').exists()).toBe(false)
+  expect(wrapper.get('[aria-label="Input source"] button:first-child').attributes('aria-pressed')).toBe('true')
 })
 
 async function mountStudioPage() {
   return mountSuspended(StudioPage, {
     global: {
       stubs: {
+        AudioScoreWorkspace: { name: 'AudioScoreWorkspace', template: '<section>Audio</section>' },
         ChartComparison: {
           props: ['images', 'contentId', 'disabled'],
           emits: ['filesSelected', 'clear'],

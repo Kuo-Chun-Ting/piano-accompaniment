@@ -38,7 +38,7 @@
     </thead>
     <tbody>
       <tr>
-        <td class="type" rowspan="234">Unit</td>
+        <td class="type" rowspan="237">Unit</td>
         <td class="file" rowspan="11"><code>tests/unit/arrangement/generateArrangement.test.ts</code></td>
         <td class="scope" rowspan="11">輸入 confirmed chart 與 style；預期輸出可播放的伴奏 score、節拍事件、歌詞 cue 與錯誤資訊。</td>
         <td class="count" rowspan="11">11</td>
@@ -442,9 +442,9 @@
         <td class="io">預期拒絕無法判讀的輸入。</td>
       </tr>
       <tr>
-        <td class="file" rowspan="2"><code>tests/unit/audio-transcription/audioScoreServer.test.ts</code></td>
-        <td class="scope" rowspan="2">輸入一般與 Range 檔案請求；預期 Server 回傳完整或指定區段的內容。</td>
-        <td class="count" rowspan="2">2</td>
+        <td class="file" rowspan="5"><code>tests/unit/audio-transcription/audioScoreServer.test.ts</code></td>
+        <td class="scope" rowspan="5">共用 Range 傳送：一般、指定範圍、尾端、無效範圍、HEAD 與空檔案。</td>
+        <td class="count" rowspan="5">8</td>
         <td class="function"><code>test_startAudioScoreServer_when_requesting_file_then_returns_complete_content</code></td>
         <td class="io">輸入一般 HTML 請求</td>
         <td class="io">預期回傳 200、完整內容與 Range 支援標頭。</td>
@@ -454,6 +454,9 @@
         <td class="io">輸入 WAV 位元組區段請求</td>
         <td class="io">預期回傳 206、Content-Range 與指定內容。</td>
       </tr>
+      <tr><td class="function"><code>test_startAudioScoreServer_when_range_is_%s_then_returns_%s</code> (4 cases)</td><td class="io">開放尾端、suffix、超出範圍、反向範圍</td><td class="io">206 與正確內容，或 416。</td></tr>
+      <tr><td class="function"><code>test_startAudioScoreServer_when_head_requested_then_returns_headers_without_body</code></td><td class="io">HEAD</td><td class="io">正確 Content-Length，沒有 body。</td></tr>
+      <tr><td class="function"><code>test_startAudioScoreServer_when_empty_file_then_returns_empty_body_without_crashing</code></td><td class="io">空檔案</td><td class="io">200，沒有未處理錯誤或卡住的連線。</td></tr>
       <tr>
         <td class="file" rowspan="2"><code>tests/unit/audio-transcription/pipeline.test.ts</code></td>
         <td class="scope" rowspan="2">輸入音訊、輸出、Python、模型與專案路徑；預期輸出固定產物配置，以及鋼琴、逐音高能量與歌詞命令。</td>
@@ -1702,21 +1705,21 @@
       </tr>
       <tr>
         <td class="file" rowspan="3"><code>tests/component/StudioPage.test.ts</code></td>
-        <td class="scope" rowspan="3">輸入 workspace 狀態；預期 Studio page 在 upload、chart、score 三種狀態下 render 正確。</td>
+        <td class="scope" rowspan="3">英文首頁與暫停圖片入口；舊 chart／score 紀錄不可繞過限制。</td>
         <td class="count" rowspan="3">3</td>
-        <td class="function"><code>test_StudioPage_when_chart_is_unavailable_then_renders_upload_workspace</code></td>
+        <td class="function"><code>test_StudioPage_when_opened_then_uses_english_and_blocks_image_entry</code></td>
         <td class="io">輸入沒有 chart 的 workspace</td>
-        <td class="io">預期顯示 upload workspace。</td>
+        <td class="io">顯示英文入口；圖片按鈕停用，點擊仍留在音訊入口。</td>
       </tr>
       <tr>
-        <td class="function"><code>test_StudioPage_when_chart_has_no_score_then_renders_chart_and_disables_score_view</code></td>
+        <td class="function"><code>test_StudioPage_when_saved_chart_exists_then_keeps_image_workspace_locked</code></td>
         <td class="io">輸入已有 chart 但無 score</td>
-        <td class="io">預期顯示 chart 並禁用 score view。</td>
+        <td class="io">仍顯示音訊入口，不顯示 chart 或導覽切換。</td>
       </tr>
       <tr>
-        <td class="function"><code>test_StudioPage_when_chart_is_confirmed_then_switches_to_score_view</code></td>
-        <td class="io">輸入 confirm 後 chart</td>
-        <td class="io">預期切到 score view。</td>
+        <td class="function"><code>test_StudioPage_when_saved_score_exists_then_keeps_image_workspace_locked</code></td>
+        <td class="io">輸入舊 chart 與 score 紀錄</td>
+        <td class="io">仍顯示音訊入口，不顯示舊圖片譜或導覽切換。</td>
       </tr>
       <tr>
         <td class="file" rowspan="3"><code>tests/component/UploadPanel.test.ts</code></td>
@@ -1747,7 +1750,7 @@
       </tr>
       <tr>
         <td class="file" rowspan="2"><code>tests/e2e/studio.spec.ts</code></td>
-        <td class="scope" rowspan="2">輸入 stubbed AI API response；預期完整瀏覽器流程可上傳、編輯、重試並產生 score。</td>
+        <td class="scope" rowspan="2">暫停：圖片入口停用。保留 stubbed AI 圖片上傳、編輯、重試與產譜 E2E，待功能重新開放。</td>
         <td class="count" rowspan="2">2</td>
         <td class="function"><code>test_studio_when_stubbed_chart_is_edited_then_sends_ordered_images_and_renders_score</code></td>
         <td class="io">輸入兩張圖片與 stubbed chart</td>
@@ -1760,11 +1763,41 @@
       </tr>
       <tr>
         <td class="file" rowspan="1"><code>tests/e2e/studio.live.spec.ts</code></td>
-        <td class="scope" rowspan="1">輸入 repo 內 `chord-charts/楓.jpeg` 與真實 AI API；預期完整 live 流程辨識、review 並產生 score。</td>
+        <td class="scope" rowspan="1">暫停：圖片入口停用。保留真實 AI 圖片轉譜 E2E，待功能重新開放。</td>
         <td class="count" rowspan="1">1</td>
         <td class="function"><code>test_studio_when_live_api_reads_feng_chart_then_renders_chart_and_score @live</code></td>
         <td class="io">輸入 `楓.jpeg` 並呼叫真實 API</td>
         <td class="io">預期標題為 `楓`，前六個和弦為 `Am`, `Em7`, `F`, `C`, `G/B`, `Am`，可建立並顯示 score。</td>
+      </tr>
+      <tr>
+        <td class="type">Unit</td><td class="file"><code>tests/unit/server/audioScoreJobs.test.ts</code></td>
+        <td class="scope">上傳串流限制、工作生命週期、失敗、互斥、取消、超時與結果驗證。</td><td class="count">12</td>
+        <td class="function"><code>test_submit_when_valid_wav_then_reports_progress_and_serves_validated_result</code><br><code>test_submit_when_filename_is_%s_then_rejects_before_running</code> (4)<br><code>test_submit_when_invalid_or_oversized_data_then_releases_capacity</code> (2)<br><code>test_submit_when_worker_fails_then_exposes_safe_error_and_allows_retry</code><br><code>test_cancel_when_processing_then_aborts_worker_without_publishing_partial_score</code><br><code>test_get_when_unknown_id_then_returns_not_found</code></td>
+        <td class="io">WAV、無效檔名／內容、大檔案、worker 成功／失敗／取消。另覆蓋 <code>test_submit_when_worker_exits_without_complete_artifacts_then_marks_job_failed</code> 與 <code>test_submit_when_processing_times_out_then_aborts_worker_and_reports_failure</code>。</td><td class="io">安全隔離的工作目錄；只有完整結果可播放；失敗可重試；同時最多一份錄音；30 分鐘超時後停止。</td>
+      </tr>
+      <tr>
+        <td class="type">Integration</td><td class="file"><code>tests/unit/server/audioScoreApi.test.ts</code></td>
+        <td class="scope">真實 HTTP route 與檔案系統，僅隔離模型 worker。</td><td class="count">1</td>
+        <td class="function"><code>test_audioScoreApi_when_wav_uploaded_then_polls_result_and_serves_seekable_audio</code></td>
+        <td class="io">POST WAV → GET 工作 → GET 音訊 Range。</td><td class="io">202、成功結果、206 正確位元組區段；未知工作 404。</td>
+      </tr>
+      <tr>
+        <td class="type">Integration</td><td class="file"><code>tests/unit/server/audioScoreWorker.test.ts</code></td>
+        <td class="scope">用測試 CLI 驗證真實子程序啟動、輸出解析與取消。</td><td class="count">3</td>
+        <td class="function"><code>test_audioScoreWorker_when_cli_succeeds_then_reports_chunked_stages_and_keeps_log</code><br><code>test_audioScoreWorker_when_cli_exits_nonzero_then_rejects</code><br><code>test_audioScoreWorker_when_cancelled_then_stops_cli_and_model_descendant</code></td>
+        <td class="io">分塊 stdout、非零退出、含子程序的執行中工作。</td><td class="io">正確階段和 log；失敗回報；取消同時停止 CLI 與模型子程序（POSIX）。</td>
+      </tr>
+      <tr>
+        <td class="type">Component</td><td class="file"><code>tests/component/AudioScoreWorkspace.test.ts</code></td>
+        <td class="scope">整區點選／拖放、固定版型、替換／移除；處理中鎖定選檔；拖離清除高亮；錯誤恢復與取消。</td><td class="count">11</td>
+        <td class="function"><code>test_AudioScoreWorkspace_when_empty_then_shows_picker_and_disabled_create_action</code><br><code>test_AudioScoreWorkspace_when_file_selected_then_keeps_picker_and_create_in_place</code><br><code>test_AudioScoreWorkspace_when_wav_dropped_then_selects_file_without_starting_transcription</code><br><code>test_AudioScoreWorkspace_when_non_wav_selected_then_blocks_submit</code><br><code>test_AudioScoreWorkspace_when_upload_fails_then_shows_error_and_allows_retry</code><br><code>test_AudioScoreWorkspace_when_existing_job_restored_then_displays_actual_stage_and_can_cancel</code><br><code>test_AudioScoreWorkspace_when_poll_connection_fails_then_keeps_active_job_recoverable</code><br><code>test_AudioScoreWorkspace_when_saved_job_no_longer_exists_then_allows_new_upload</code></td>
+        <td class="io">檔案選擇、拖放、移除、上傳錯誤、已儲存工作 ID、暫時斷線與 404。</td><td class="io">移除後恢復空白／停用產譜；處理中不能替換；拖離清除高亮；保留重試與取消。新增：<code>test_AudioScoreWorkspace_when_file_removed_then_returns_to_empty_without_submitting</code>、<code>test_AudioScoreWorkspace_when_busy_then_blocks_replacement_and_removal</code>、<code>test_AudioScoreWorkspace_when_drag_leaves_picker_then_clears_highlight</code>。</td>
+      </tr>
+      <tr>
+        <td class="type">E2E</td><td class="file"><code>tests/e2e/audio-studio.spec.ts</code></td>
+        <td class="scope">英文音訊流程、整區點選／鍵盤／拖放替換、移除不開啟選檔視窗；選檔前後位置一致，窄螢幕長檔名不溢出；圖片入口停用。stub 模型 API，使用真實 VexFlow 與原生 HTMLAudioElement。</td><td class="count">3</td>
+        <td class="function"><code>test_audio_studio_when_file_selected_or_replaced_then_preserves_control_positions</code><br><code>test_audio_studio_when_uploaded_then_renders_restores_and_seeks_native_reference_audio</code><br><code>test_audio_studio_when_transcription_fails_then_can_retry_and_cancel</code></td>
+        <td class="io">WAV 上傳、工作輪詢、重新整理、原曲前後跳轉、失敗重試與取消、390px 窄螢幕。</td><td class="io">正確結果與雙模式 Player；原生音訊時間隨進度跳轉；取消顯示完成；播放／停止／進度同組，Tempo 不遮住時間。</td>
       </tr>
     </tbody>
   </table>

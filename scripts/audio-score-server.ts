@@ -1,8 +1,8 @@
-import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { createServer, type Server, type ServerResponse } from 'node:http'
 import { extname, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { sendRangeFile } from '../server/services/rangeFile'
 
 export interface AudioScoreServerOptions {
   host: string
@@ -15,17 +15,12 @@ export interface RunningAudioScoreServer {
   close: () => Promise<void>
 }
 
-interface ByteRange {
-  start: number
-  end: number
-}
-
 export async function startAudioScoreServer(
   options: AudioScoreServerOptions,
 ): Promise<RunningAudioScoreServer> {
   const rootDirectory = resolve(options.rootDirectory)
   const server = createServer((request, response) => {
-    void serveRequest(rootDirectory, request.url ?? '/', request.headers.range, response)
+    void serveRequest(rootDirectory, request.url ?? '/', request.headers.range, response, request.method === 'HEAD')
   })
 
   await listen(server, options.host, options.port)
@@ -45,19 +40,11 @@ async function serveRequest(
   requestUrl: string,
   rangeHeader: string | undefined,
   response: ServerResponse,
+  head: boolean,
 ): Promise<void> {
   try {
     const filePath = await resolveFilePath(rootDirectory, requestUrl)
-    const fileStats = await stat(filePath)
-    const range = parseRange(rangeHeader, fileStats.size)
-
-    if (rangeHeader && !range) {
-      response.writeHead(416, { 'Content-Range': `bytes */${fileStats.size}` })
-      response.end()
-      return
-    }
-
-    sendFile(response, filePath, fileStats.size, range)
+    await sendRangeFile(response, filePath, contentType(filePath), rangeHeader, head)
   }
   catch {
     response.writeHead(404)
@@ -74,46 +61,6 @@ async function resolveFilePath(rootDirectory: string, requestUrl: string): Promi
 
   const requestedStats = await stat(requestedPath)
   return requestedStats.isDirectory() ? resolve(requestedPath, 'index.html') : requestedPath
-}
-
-function sendFile(
-  response: ServerResponse,
-  filePath: string,
-  fileSize: number,
-  range?: ByteRange,
-): void {
-  const start = range?.start ?? 0
-  const end = range?.end ?? fileSize - 1
-  const headers: Record<string, string | number> = {
-    'Accept-Ranges': 'bytes',
-    'Content-Length': Math.max(0, end - start + 1),
-    'Content-Type': contentType(filePath),
-  }
-
-  if (range) {
-    headers['Content-Range'] = `bytes ${start}-${end}/${fileSize}`
-  }
-
-  response.writeHead(range ? 206 : 200, headers)
-  createReadStream(filePath, { start, end }).pipe(response)
-}
-
-function parseRange(rangeHeader: string | undefined, fileSize: number): ByteRange | undefined {
-  if (!rangeHeader) return undefined
-
-  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim())
-  if (!match || fileSize === 0) return undefined
-
-  const [, rawStart, rawEnd] = match
-  if (!rawStart && !rawEnd) return undefined
-
-  const start = rawStart ? Number(rawStart) : Math.max(0, fileSize - Number(rawEnd))
-  const end = rawEnd && rawStart ? Math.min(Number(rawEnd), fileSize - 1) : fileSize - 1
-  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= fileSize) {
-    return undefined
-  }
-
-  return { start, end }
 }
 
 function contentType(filePath: string): string {

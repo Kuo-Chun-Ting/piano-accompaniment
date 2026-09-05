@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
+test.skip(true, 'Chord sheet image entry is temporarily disabled.')
+
 const LIVE_CHART_PATH = 'chord-charts/楓.jpeg'
 const MIN_EXPECTED_MEASURES = 40
 
@@ -21,6 +23,7 @@ test('test_studio_when_live_api_reads_feng_chart_then_renders_chart_and_score @l
     }
   })
   await openStudio(page)
+  await page.getByRole('button', { name: 'Chord Sheet Image', exact: true }).click()
   await page.setInputFiles('input[type="file"]', LIVE_CHART_PATH)
   await page.getByLabel('Analysis model').selectOption('gpt-5.5')
 

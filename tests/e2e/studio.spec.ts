@@ -7,6 +7,8 @@ import {
 } from '@playwright/test'
 import { extractedChartFixture } from '../fixtures/extractedChart'
 
+test.skip(true, 'Chord sheet image entry is temporarily disabled.')
+
 const TRANSPARENT_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',
@@ -52,6 +54,7 @@ async function openStudio(page: Page): Promise<void> {
 }
 
 async function uploadCharts(page: Page, filenames: string[]): Promise<void> {
+  await page.getByRole('button', { name: 'Chord Sheet Image', exact: true }).click()
   await page.setInputFiles(
     'input[type="file"]',
     filenames.map(name => ({

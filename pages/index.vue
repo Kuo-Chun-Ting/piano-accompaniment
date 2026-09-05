@@ -10,6 +10,8 @@ type StudioView = 'chart' | 'score'
 const workspace = useChartWorkspace()
 const activeView = ref<StudioView>('chart')
 const hasChart = computed(() => workspace.extractedChart.value !== null)
+const source = ref<'audio' | 'image'>('audio')
+const audioHasResult = ref(false)
 const hasScore = computed(() =>
   workspace.arrangements.value !== null && workspace.confirmedChart.value !== null,
 )
@@ -53,12 +55,21 @@ function handleConfirm(selection: ConfirmChartSelection): void {
   <main class="app-shell">
     <StudioToolbar
       :active-view="activeView"
-      :chart-available="hasChart"
-      :score-available="hasScore"
+      :chart-available="source === 'image' && hasChart"
+      :score-available="source === 'image' && hasScore"
       @view-changed="activeView = $event"
     />
 
     <div class="workspace">
+      <header v-if="source !== 'audio' || !audioHasResult" class="source-heading">
+        <h1 v-if="!hasChart || source === 'audio'">Create Piano Score</h1>
+        <div class="source-picker" role="group" aria-label="Input source">
+          <button :aria-pressed="source === 'audio'" @click="source = 'audio'">Audio File</button>
+          <button :aria-pressed="source === 'image'" disabled>Chord Sheet Image</button>
+        </div>
+      </header>
+      <AudioScoreWorkspace v-if="source === 'audio'" @result="audioHasResult = $event" />
+      <template v-if="source === 'image'">
       <UploadPanel
         v-if="!hasChart"
         :file-names="workspace.uploadedImages.value.map(image => image.filename)"
@@ -114,6 +125,7 @@ function handleConfirm(selection: ConfirmChartSelection): void {
           Salamander Grand Piano by Alexander Holm, CC BY 3.0
         </a>
       </footer>
+      </template>
     </div>
   </main>
 </template>
@@ -152,6 +164,13 @@ function handleConfirm(selection: ConfirmChartSelection): void {
   min-height: 44px;
   align-items: center;
 }
+.source-heading { text-align: center; margin: 8px 0 6px; }
+.source-heading h1 { font-size: clamp(24px, 3vw, 28px); letter-spacing: -.035em; margin: 0 0 20px; font-weight: 650; }
+.source-picker { display: inline-flex; padding: 3px; background: #e8e8ed; border-radius: 10px; }
+.source-picker button { border: 0; border-radius: 8px; background: transparent; color: #55555b; padding: 9px 22px; font: inherit; font-size: 14px; cursor: pointer; }
+.source-picker button[aria-pressed="true"] { background: white; color: #1d1d1f; box-shadow: 0 1px 4px #0002; }
+.source-picker button:disabled { opacity: .4; cursor: default; }
+.source-picker button:focus-visible { outline: 3px solid #007aff; outline-offset: 2px; }
 .workspace-heading h2 {
   margin: 0;
   font-size: clamp(28px, 3vw, 40px);
