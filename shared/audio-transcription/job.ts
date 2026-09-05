@@ -11,20 +11,30 @@ export interface AudioScoreJob {
   result?: ViewerScoreData
 }
 
-const STAGE_LABELS: Record<string, string> = {
-  uploading: 'Uploading audio…',
-  starting: 'Preparing…',
-  'check-environment': 'Checking setup…',
-  'normalize-audio': 'Reading audio…',
-  'separate-piano': 'Separating piano…',
-  'transcribe-midi': 'Transcribing notes…',
-  'analyze-structure': 'Analyzing beats…',
-  'export-midi-notes': 'Processing notes…',
-  'export-pitch-energy': 'Analyzing sustain…',
-  'transcribe-lyrics': 'Transcribing lyrics…',
-  'build-viewer': 'Creating score…',
+export const AUDIO_SCORE_PHASES = [
+  'Uploading audio…', 'Separating piano…', 'Recognizing notes…',
+  'Recognizing lyrics…', 'Creating score…',
+] as const
+
+const STAGE_PHASES: Record<string, number> = {
+  uploading: 0,
+  starting: 1,
+  'check-environment': 1,
+  'normalize-audio': 1,
+  'separate-piano': 1,
+  'transcribe-midi': 2,
+  'analyze-structure': 2,
+  'export-midi-notes': 2,
+  'export-pitch-energy': 2,
+  'transcribe-lyrics': 3,
+  'build-viewer': 4,
+}
+
+export function audioScorePhase(stage: string): number {
+  return STAGE_PHASES[stage] ?? -1
 }
 
 export function audioScoreStageLabel(stage: string): string {
-  return STAGE_LABELS[stage] ?? 'Transcribing…'
+  if (['starting', 'check-environment', 'normalize-audio'].includes(stage)) return 'Preparing audio…'
+  return AUDIO_SCORE_PHASES[audioScorePhase(stage)] ?? 'Processing audio…'
 }

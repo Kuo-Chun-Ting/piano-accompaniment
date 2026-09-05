@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ProductIcon from './ProductIcon.vue'
+
 type StudioView = 'chart' | 'score'
 
 const props = defineProps<{
@@ -15,7 +17,7 @@ const emit = defineEmits<{
 <template>
   <header class="studio-toolbar">
     <div class="brand">
-      <span class="app-icon" aria-hidden="true">♪</span>
+      <ProductIcon class="app-icon" />
       <h1>Piano Accompaniment Studio</h1>
     </div>
 
@@ -53,13 +55,11 @@ const emit = defineEmits<{
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .app-icon {
-  display: grid;
+  display: block;
   width: 24px;
   height: 28px;
-  place-items: center;
+  flex-shrink: 0;
   color: #1d1d1f;
-  font-size: 19px;
-  font-weight: 650;
 }
 h1 {
   margin: 0;

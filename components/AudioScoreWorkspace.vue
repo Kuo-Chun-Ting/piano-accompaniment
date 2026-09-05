@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ProductIcon from './ProductIcon.vue'
+import { AUDIO_SCORE_PHASES, audioScorePhase, audioScoreStageLabel } from '../shared/audio-transcription/job'
 const emit = defineEmits<{ busy: [value: boolean]; result: [value: boolean] }>()
 const { file, job, error, busy, uploading, reconnecting, cancelling, selectFile, start, cancel, reset, reconnect } = useAudioScoreWorkspace()
 const dragging = ref(false)
@@ -9,7 +11,10 @@ const filenameParts = computed(() => {
 })
 const result = computed(() => job.value?.status === 'succeeded' ? job.value.result : undefined)
 const locked = computed(() => busy.value || reconnecting.value)
-const statusText = computed(() => cancelling.value ? 'Cancelling…' : reconnecting.value ? 'Connection lost' : uploading.value ? 'Uploading…' : 'Transcribing…')
+const stage = computed(() => uploading.value ? 'uploading' : job.value?.stage ?? '')
+const phase = computed(() => audioScorePhase(stage.value))
+const advancing = computed(() => locked.value && !cancelling.value && !reconnecting.value)
+const statusText = computed(() => cancelling.value ? 'Cancelling…' : reconnecting.value ? 'Connection lost' : audioScoreStageLabel(stage.value))
 watch(busy, value => emit('busy', value), { immediate: true })
 watch(result, value => emit('result', Boolean(value)), { immediate: true })
 
@@ -45,10 +50,7 @@ function onDragLeave(event: DragEvent): void {
         @dragover.prevent="dragging = !locked" @dragleave="onDragLeave" @drop.prevent="onDrop">
         <div class="file-row">
           <label class="file-picker" :class="{ 'file-info': filename }" :title="filename ? 'Choose another WAV file' : undefined">
-            <svg class="note-icon" viewBox="0 0 32 40" aria-hidden="true">
-              <path d="M20 29V5c0 7 10 5 8 15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-              <ellipse cx="13.5" cy="30" rx="7.5" ry="5" transform="rotate(-18 13.5 30)" fill="currentColor" />
-            </svg>
+            <ProductIcon class="note-icon" />
             <span v-if="filename" class="filename" :title="filename" :aria-label="filename"><span class="filename-start">{{ filenameParts.start }}</span><span class="filename-tail">{{ filenameParts.tail }}</span></span>
             <span v-else class="picker-caption"><span>Choose a WAV file</span><span id="audio-file-limit" class="file-limit">Max 100 MB</span></span>
             <input aria-label="Audio file" :aria-describedby="!filename ? 'audio-file-limit' : undefined" type="file" accept=".wav,audio/wav" :disabled="locked" @change="onFile">
@@ -57,9 +59,14 @@ function onDragLeave(event: DragEvent): void {
         </div>
         <AudioFilePreview v-if="file" :file="file" :disabled="false" />
       </div>
-      <div v-if="filename || locked" class="actions">
+      <ol v-if="locked" class="phase-progress" :class="{ advancing }" aria-label="Transcription stages">
+        <li v-for="(label, index) in AUDIO_SCORE_PHASES" :key="label"
+          :class="{ complete: index < phase, current: index === phase }"
+          :aria-label="label" :aria-current="index === phase ? 'step' : undefined" />
+      </ol>
+      <div v-if="filename || locked" class="actions" :class="{ processing: locked }">
         <template v-if="locked">
-          <p role="status" aria-live="polite" class="stage"><span v-if="!reconnecting || cancelling" class="spinner" aria-hidden="true" />{{ statusText }}</p>
+          <p role="status" aria-live="polite" class="stage">{{ statusText }}</p>
           <button v-if="reconnecting && !cancelling" class="text-action" @click="reconnect">Reconnect</button>
           <button v-if="!uploading" class="text-action" :disabled="cancelling" @click="cancel">Cancel</button>
         </template>
@@ -102,7 +109,12 @@ label:has(input:focus-visible), button:focus-visible { outline: 2px solid #63636
 .primary:disabled { background: #e5e5e8; border-color: #e5e5e8; color: #88888d; }
 button:disabled, input:disabled, .disabled .file-picker { cursor: default; }
 .stage { display: flex; align-items: center; gap: 8px; color: #636368; font-size: 13px; margin: 0 auto 0 0; }
-.spinner { width: 14px; height: 14px; border: 2px solid #d4d4d8; border-top-color: #636368; border-radius: 50%; animation: spin 1s linear infinite; }
+.phase-progress { display: flex; gap: 5px; list-style: none; padding: 0; margin: 20px 0 0; }
+.phase-progress li { flex: 1; height: 3px; border-radius: 2px; background: #dedee2; }
+.phase-progress .complete { background: #1d1d1f; }
+.phase-progress .current { background: #737378; }
+.phase-progress.advancing .current { animation: pulse 1.8s ease-in-out infinite; }
+.actions.processing { margin-top: 4px; }
 .error { color: #b42318; line-height: 1.5; font-size: 14px; }
 .result-heading { margin-bottom: 20px; }
 .back { border: 0; background: none; padding: 4px 0; }
@@ -110,7 +122,7 @@ button:disabled, input:disabled, .disabled .file-picker { cursor: default; }
 .audio-score-panel { flex: 1; min-height: 0; overflow: hidden; border: 1px solid #dedee2; border-radius: 14px; }
 .audio-credit { text-align: right; font-size: 11px; margin-top: 12px; }
 .audio-credit a { color: #86868b; text-decoration: none; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } .drop-zone { transition: none; } }
+@keyframes pulse { 50% { opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .phase-progress.advancing .current { animation: none; } .drop-zone { transition: none; } }
 @media (pointer: coarse) { .remove-file { width: 44px; height: 44px; } }
 </style>

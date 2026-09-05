@@ -85,6 +85,37 @@ test('test_audio_studio_when_file_selected_then_previews_locally_and_clears_with
   await expect(create).toBeEnabled()
 })
 
+test('test_audio_studio_when_phases_advance_then_updates_segments_without_moving_preview', async ({ page }, testInfo) => {
+  // Arrange
+  let stage = 'separate-piano'
+  await page.route('**/api/audio-scores', route => route.fulfill({ status: 202, json: { id: 'phases', title: 'song', status: 'running', stage } }))
+  await page.route('**/api/audio-scores/phases', route => route.fulfill({ json: { id: 'phases', title: 'song', status: 'running', stage } }))
+  await page.goto('/')
+  await page.waitForFunction(() => '__vue_app__' in (document.querySelector('#__nuxt') ?? {}))
+  await page.getByLabel('Audio file', { exact: true }).setInputFiles({ name: 'song.wav', mimeType: 'audio/wav', buffer: buildAudioWavFixture(8) })
+  const preview = page.getByRole('region', { name: 'Audio preview' })
+  const before = await preview.boundingBox()
+  // Act & Assert
+  await page.getByRole('button', { name: 'Transcribe', exact: true }).click()
+  for (const [nextStage, label, completed] of [
+    ['separate-piano', 'Separating piano', 1],
+    ['transcribe-midi', 'Recognizing notes', 2],
+    ['transcribe-lyrics', 'Recognizing lyrics', 3],
+    ['build-viewer', 'Creating score', 4],
+  ] as const) {
+    stage = nextStage
+    await expect(page.getByRole('status')).toContainText(label)
+    await expect(page.locator('.phase-progress .complete')).toHaveCount(completed)
+    await expect(page.locator('.phase-progress [aria-current=step]')).toHaveCount(1)
+    expect((await preview.boundingBox())?.y).toBe(before?.y)
+  }
+  await page.screenshot({ path: testInfo.outputPath('progress-desktop.png') })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  await page.screenshot({ path: testInfo.outputPath('progress-mobile.png') })
+})
+
 test('test_audio_studio_when_uploaded_then_renders_restores_and_seeks_native_reference_audio', async ({ page }) => {
   // Arrange: only the transcription backend is stubbed, not browser audio or score rendering.
   const wav = buildAudioWavFixture()
@@ -123,7 +154,7 @@ test('test_audio_studio_when_uploaded_then_renders_restores_and_seeks_native_ref
   await page.getByLabel('Audio file', { exact: true }).setInputFiles({ name: '楓.wav', mimeType: 'audio/wav', buffer: wav })
   await page.getByRole('button', { name: 'Transcribe', exact: true }).click()
   // Assert
-  await expect(page.getByRole('status')).toContainText('Transcribing')
+  await expect(page.getByRole('status')).toContainText('Separating piano')
   await expect(page.locator('.score-system svg').first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Rich', exact: true })).toHaveCount(0)
   // Act: restore and seek from early playback directly to the tenth measure.
@@ -177,7 +208,7 @@ test('test_audio_studio_when_transcription_fails_then_can_retry_and_cancel', asy
   await page.getByRole('button', { name: 'Transcribe', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Transcription failed')
   await page.getByRole('button', { name: 'Retry', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText('Transcribing')
+  await expect(page.getByRole('status')).toContainText('Recognizing notes')
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page.getByRole('status')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Transcribe', exact: true })).toBeEnabled()
@@ -197,7 +228,7 @@ test('test_audio_studio_when_dragging_during_transcription_then_keeps_preview_in
   await expect.poll(() => media.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThan(0)
   // Act: starting a job must not interrupt playback.
   await page.getByRole('button', { name: 'Transcribe', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText('Transcribing')
+  await expect(page.getByRole('status')).toContainText('Recognizing notes')
   await expect(preview.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled()
   for (const fraction of [0.8, 0.2]) {
     const box = (await slider.boundingBox())!

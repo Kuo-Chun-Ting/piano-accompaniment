@@ -1789,7 +1789,7 @@
       </tr>
       <tr>
         <td class="type">Component</td><td class="file"><code>tests/component/AudioScoreWorkspace.test.ts</code></td>
-        <td class="scope">檔名與試聽同組，選檔與提交分離；無效替換保留原檔；轉譜不鎖試聽；取消等待背景結束。</td><td class="count">17</td>
+        <td class="scope">檔名與試聽同組，選檔與提交分離；無效替換保留原檔；轉譜不鎖試聽；取消等待背景結束。五階段映射、目前階段與已完成分段；取消及斷線停止動畫。新增 <code>test_AudioScoreWorkspace_when_stage_is_%s_then_shows_current_phase</code>（8 種階段）及 <code>test_AudioScoreWorkspace_when_upload_pending_then_shows_first_phase_and_keeps_preview</code>。</td><td class="count">26</td>
         <td class="function"><code>test_AudioScoreWorkspace_when_empty_then_shows_file_picker_without_submit</code><br><code>test_AudioScoreWorkspace_when_file_selected_then_keeps_picker_separate_from_submit</code><br><code>test_AudioScoreWorkspace_when_wav_dropped_then_selects_file_without_starting_transcription</code><br><code>test_AudioScoreWorkspace_when_non_wav_selected_then_blocks_submit</code><br><code>test_AudioScoreWorkspace_when_upload_fails_then_shows_error_and_allows_retry</code><br><code>test_AudioScoreWorkspace_when_existing_job_restored_then_displays_processing_and_can_cancel</code><br><code>test_AudioScoreWorkspace_when_poll_connection_fails_then_keeps_active_job_recoverable</code><br><code>test_AudioScoreWorkspace_when_saved_job_no_longer_exists_then_allows_new_upload</code><br><code>test_AudioScoreWorkspace_when_restored_job_is_%s_then_can_clear_and_choose_again</code>（failed、cancelled）<br><code>test_AudioScoreWorkspace_when_invalid_replacement_dropped_then_preserves_selected_file</code><br><code>test_AudioScoreWorkspace_when_transcribing_then_keeps_preview_enabled_and_cancel_acknowledged</code><br><code>test_AudioScoreWorkspace_when_restoring_pending_job_then_shows_processing_feedback</code><br><code>test_AudioScoreWorkspace_when_cancel_accepted_but_worker_running_then_waits_for_terminal_status</code></td>
         <td class="io">選檔、拖放、移除、上傳錯誤、工作恢復、暫時斷線與 404。</td><td class="io">選檔不提交；移除恢復選檔；處理中不能替換；恢復失敗或取消工作後仍能清除重選。另含 <code>test_AudioScoreWorkspace_when_file_removed_then_returns_to_empty_without_submitting</code>、<code>test_AudioScoreWorkspace_when_busy_then_blocks_replacement_and_removal</code>、<code>test_AudioScoreWorkspace_when_drag_leaves_picker_then_clears_highlight</code>。</td>
       </tr>
@@ -1807,9 +1807,15 @@
       </tr>
       <tr>
         <td class="type">E2E</td><td class="file"><code>tests/e2e/audio-studio.spec.ts</code></td>
-        <td class="scope">選檔／鍵盤／拖放／清除；本機試聽不 POST、不自動播放；長檔名不溢出；轉譜中真實滑鼠按住拖曳 1.2 秒，前後跳轉與暫停仍可用。模型 API stub，真實 VexFlow 與 HTMLAudioElement。</td><td class="count">4</td>
+        <td class="scope">選檔／鍵盤／拖放／清除；本機試聽不 POST、不自動播放；長檔名不溢出；轉譜中真實滑鼠按住拖曳 1.2 秒，前後跳轉與暫停仍可用。模型 API stub，真實 VexFlow 與 HTMLAudioElement。新增 <code>test_audio_studio_when_phases_advance_then_updates_segments_without_moving_preview</code>：階段依輪詢更新、試聽位置不變、390px 不溢出，擷取桌面與手機畫面。</td><td class="count">5</td>
         <td class="function"><code>test_audio_studio_when_file_selected_then_previews_locally_and_clears_without_upload</code><br><code>test_audio_studio_when_uploaded_then_renders_restores_and_seeks_native_reference_audio</code><br><code>test_audio_studio_when_transcription_fails_then_can_retry_and_cancel</code><br><code>test_audio_studio_when_dragging_during_transcription_then_keeps_preview_interactive</code></td>
         <td class="io">本機 WAV、上傳、工作輪詢、重新整理、原曲前後跳轉、失敗重試與取消、390px 窄螢幕。</td><td class="io">blob 試聽／seek；清除停止播放並恢復入口；正確轉譜結果與雙模式 Player；共用播放控制保留 Score 停止與原曲跳轉；Tempo 不遮住時間。</td>
+      </tr>
+      <tr>
+        <td class="type">Component</td><td class="file"><code>tests/component/ProductIcon.test.ts</code></td>
+        <td class="scope">標頭與上傳區共用產品 icon，避免圖形來源分歧。</td><td class="count">1</td>
+        <td class="function"><code>test_ProductIcon_when_toolbar_and_upload_render_then_share_icon_source</code></td>
+        <td class="io">標頭、音訊上傳區。</td><td class="io">兩處使用同一 ProductIcon 元件，SVG 比例相同，裝飾圖示不重複朗讀。</td>
       </tr>
     </tbody>
   </table>

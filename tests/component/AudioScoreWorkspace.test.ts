@@ -165,8 +165,49 @@ test('test_AudioScoreWorkspace_when_restoring_pending_job_then_shows_processing_
   // Act
   const wrapper = await mountAudio()
   // Assert
-  expect(wrapper.get('[role=status]').text()).toContain('Transcribing')
+  expect(wrapper.get('[role=status]').text()).toContain('Preparing')
   expect(wrapper.findAll('button').some(button => button.text() === 'Cancel')).toBe(true)
+  wrapper.unmount()
+})
+
+test.each([
+  ['uploading', 0, 'Uploading audio'],
+  ['separate-piano', 1, 'Separating piano'],
+  ['transcribe-midi', 2, 'Recognizing notes'],
+  ['analyze-structure', 2, 'Recognizing notes'],
+  ['export-midi-notes', 2, 'Recognizing notes'],
+  ['export-pitch-energy', 2, 'Recognizing notes'],
+  ['transcribe-lyrics', 3, 'Recognizing lyrics'],
+  ['build-viewer', 4, 'Creating score'],
+])('test_AudioScoreWorkspace_when_stage_is_%s_then_shows_current_phase', async (stage, phase, label) => {
+  // Arrange
+  sessionStorage.setItem('audio-score-job', 'progress')
+  fetchMock.mockResolvedValue({ id: 'progress', title: 'Song', status: 'running', stage })
+  // Act
+  const wrapper = await mountAudio()
+  await flushPromises()
+  // Assert
+  const steps = wrapper.findAll('.phase-progress li')
+  expect(steps).toHaveLength(5)
+  expect(steps[phase].attributes('aria-current')).toBe('step')
+  expect(wrapper.findAll('.phase-progress .complete')).toHaveLength(phase)
+  expect(wrapper.get('[role=status]').text()).toContain(label)
+  expect(wrapper.text()).not.toContain('%')
+  wrapper.unmount()
+})
+
+test('test_AudioScoreWorkspace_when_upload_pending_then_shows_first_phase_and_keeps_preview', async () => {
+  // Arrange
+  fetchMock.mockImplementation(() => new Promise(() => {}))
+  const wrapper = await mountAudio()
+  await chooseFile(wrapper, 'song.wav')
+  // Act
+  await wrapper.get('[data-test=start-transcription]').trigger('click')
+  // Assert
+  expect(wrapper.get('[role=status]').text()).toBe('Uploading audio…')
+  expect(wrapper.findAll('.phase-progress li')[0].attributes('aria-current')).toBe('step')
+  expect(wrapper.findAll('.phase-progress .complete')).toHaveLength(0)
+  expect(wrapper.findComponent({ name: 'AudioFilePreview' }).props('disabled')).toBe(false)
   wrapper.unmount()
 })
 
@@ -229,6 +270,7 @@ test('test_AudioScoreWorkspace_when_transcribing_then_keeps_preview_enabled_and_
   await cancel.trigger('click')
   expect(wrapper.get('[role=status]').text()).toContain('Cancelling')
   expect(cancel.attributes('disabled')).toBeDefined()
+  expect(wrapper.get('.phase-progress').classes()).not.toContain('advancing')
   cancelled = true
   resolveCancel({})
   await flushPromises()
@@ -245,6 +287,7 @@ test('test_AudioScoreWorkspace_when_poll_connection_fails_then_keeps_active_job_
   await flushPromises()
   // Assert
   expect(wrapper.text()).toContain('Reconnect')
+  expect(wrapper.get('.phase-progress').classes()).not.toContain('advancing')
   expect(wrapper.text()).toContain('Cancel')
   expect(wrapper.text()).not.toContain('New Upload')
   expect(sessionStorage.getItem('audio-score-job')).toBe('job-1')
