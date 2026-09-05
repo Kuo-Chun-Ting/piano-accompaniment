@@ -30,5 +30,5 @@
 1. 預設執行所有不會呼叫真實 API 的測試。
 2. 只有修改 prompt、AI schema、model 選擇或真實 API 串接時，才執行會呼叫真實 AI API 的 `@live` E2E test。
 3. 修改音訊轉譜、五線譜渲染或 Player，且使用者已要求更新實際產物時，使用目前 worktree 的程式自行重建 `.audio-score/安靜` 與 `.audio-score/楓`，不要要求使用者執行。重建後使用本機權限執行 `npm run audio:score:verify`；兩者都通過才算完成。
-4. 驗證實際產物外觀時，從專案根目錄執行 `python3 -m http.server 3200 --bind 127.0.0.1`，再用 Browser 開啟 `http://127.0.0.1:3200/.audio-score/安靜/index.html` 與 `http://127.0.0.1:3200/.audio-score/楓/index.html`。必須實際檢查兩份畫面；不可使用 `file://`，也不可只依賴自動驗證結果。
+4. 驗證實際產物外觀與音訊跳轉時，從專案根目錄執行 `npm run audio:score:serve`，再用 Browser 開啟 `http://127.0.0.1:3200/.audio-score/安靜/index.html` 與 `http://127.0.0.1:3200/.audio-score/楓/index.html`。必須實際檢查兩份畫面；不可使用 `file://`，也不可只依賴自動驗證結果。
 5. 執行 `npm run test:e2e` 或 `npm run test:e2e:live` 前先停止上述靜態 Server。未設定 `PLAYWRIGHT_BASE_URL` 時，由 Playwright 自動在 `3200` 啟動測試網站；不要改用 `npm run dev` 的 `3000`。

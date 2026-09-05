@@ -83,7 +83,7 @@ The command creates or overwrites `.audio-score/<recording-name>/` beside the WA
 Serve the project directory to view and play generated scores:
 
 ```bash
-python3 -m http.server 3200 --bind 127.0.0.1
+npm run audio:score:serve
 ```
 
 Open `http://127.0.0.1:3200/.audio-score/<recording-name>/index.html`.

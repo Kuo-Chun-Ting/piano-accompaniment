@@ -13,6 +13,7 @@
     "typecheck": "nuxt typecheck",
     "audio:score:viewer": "vite build --config tools/audio-score-viewer/vite.config.ts",
     "audio:score": "tsx scripts/audio-score.ts",
+    "audio:score:serve": "tsx scripts/audio-score-server.ts",
     "audio:score:verify": "tsx scripts/audio-score-verify.ts && vitest run tests/component/AudioScoreGeneratedOutput.test.ts tests/component/PianoScoreSystem.test.ts"
   },
   "dependencies": {

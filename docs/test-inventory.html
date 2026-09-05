@@ -442,6 +442,19 @@
         <td class="io">預期拒絕無法判讀的輸入。</td>
       </tr>
       <tr>
+        <td class="file" rowspan="2"><code>tests/unit/audio-transcription/audioScoreServer.test.ts</code></td>
+        <td class="scope" rowspan="2">輸入一般與 Range 檔案請求；預期 Server 回傳完整或指定區段的內容。</td>
+        <td class="count" rowspan="2">2</td>
+        <td class="function"><code>test_startAudioScoreServer_when_requesting_file_then_returns_complete_content</code></td>
+        <td class="io">輸入一般 HTML 請求</td>
+        <td class="io">預期回傳 200、完整內容與 Range 支援標頭。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_startAudioScoreServer_when_requesting_byte_range_then_returns_partial_content</code></td>
+        <td class="io">輸入 WAV 位元組區段請求</td>
+        <td class="io">預期回傳 206、Content-Range 與指定內容。</td>
+      </tr>
+      <tr>
         <td class="file" rowspan="2"><code>tests/unit/audio-transcription/pipeline.test.ts</code></td>
         <td class="scope" rowspan="2">輸入音訊、輸出、Python、模型與專案路徑；預期輸出固定產物配置，以及鋼琴、逐音高能量與歌詞命令。</td>
         <td class="count" rowspan="2">2</td>
