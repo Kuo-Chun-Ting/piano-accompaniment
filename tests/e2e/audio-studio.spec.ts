@@ -1,64 +1,88 @@
 import { expect, test } from '@playwright/test'
 import { buildAudioScoreFixture, buildAudioWavFixture } from '../fixtures/audioScore'
 
-test('test_audio_studio_when_file_selected_or_replaced_then_preserves_control_positions', async ({ page }) => {
+test('test_audio_studio_when_note_selected_then_previews_locally_and_clears_without_upload', async ({ page }) => {
   // Arrange
+  const uploads: string[] = []
+  page.on('request', request => { if (request.method() === 'POST') uploads.push(request.url()) })
   await page.goto('/')
   await page.waitForFunction(() => '__vue_app__' in (document.querySelector('#__nuxt') ?? {}))
-  const create = page.getByRole('button', { name: 'Create Score', exact: true })
-  const target = page.locator('.drop-zone label')
-  await expect(create).toBeDisabled()
+  const create = page.getByRole('button', { name: 'Transcribe', exact: true })
+  const target = page.locator('.note-head')
+  await expect(create).toHaveCount(0)
   const initialPicker = await target.boundingBox()
-  const initialCreate = await create.boundingBox()
-  // Act: the same picker is available before and after selection.
+  await expect(target).toContainText('Max 100 MB')
+  // Act: choose a real WAV, without submitting it to the server.
   const chooserPromise = page.waitForEvent('filechooser')
-  await target.click({ position: { x: 12, y: 12 } })
-  await (await chooserPromise).setFiles({ name: 'first.wav', mimeType: 'audio/wav', buffer: buildAudioWavFixture(1) })
+  await target.click()
+  await (await chooserPromise).setFiles({ name: 'first.wav', mimeType: 'audio/wav', buffer: buildAudioWavFixture(8) })
   // Assert
-  await expect(target).toContainText('first.wav')
-  expect(await target.boundingBox()).toEqual(initialPicker)
-  expect(await create.boundingBox()).toEqual(initialCreate)
-  await expect(page.locator('.drop-zone')).toContainText('first.wav')
-  await expect(page.getByRole('button', { name: 'Create Score', exact: true })).toBeEnabled()
-  // Act: the picker remains accessible by keyboard.
-  const replacementPromise = page.waitForEvent('filechooser')
-  await page.getByLabel('Audio file', { exact: true }).focus()
-  await page.keyboard.press('Enter')
-  await (await replacementPromise).setFiles({ name: 'second.wav', mimeType: 'audio/wav', buffer: buildAudioWavFixture(1) })
-  // Assert
-  await expect(page.locator('.drop-zone')).toContainText('second.wav')
-  await expect(page.locator('.drop-zone')).not.toContainText('first.wav')
+  await expect(page.locator('.file-info')).toContainText('first.wav')
+  await expect(create).toBeEnabled()
+  expect(await create.boundingBox()).toEqual(initialPicker)
+  const preview = page.getByRole('region', { name: 'Audio preview' })
+  const media = preview.locator('audio')
+  await expect(preview.getByRole('button', { name: 'Play', exact: true })).toBeEnabled()
+  expect(await media.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(true)
+  expect(await media.evaluate((audio: HTMLAudioElement) => audio.currentSrc)).toMatch(/^blob:/)
+  await expect(preview.getByRole('button', { name: 'Stop' })).toHaveCount(0)
+  // Act: play, pause, seek both directions, and resume from the new time.
+  await preview.getByRole('button', { name: 'Play', exact: true }).click()
+  await expect.poll(() => media.evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThan(0)
+  await preview.getByRole('button', { name: 'Pause', exact: true }).click()
+  expect(await media.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(true)
+  const progress = preview.getByLabel('Playback progress')
+  await progress.fill('0.75')
+  await progress.dispatchEvent('change')
+  await expect.poll(() => media.evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeCloseTo(6, 1)
+  await progress.fill('0.25')
+  await progress.dispatchEvent('change')
+  await expect.poll(() => media.evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeCloseTo(2, 1)
+  await preview.getByRole('button', { name: 'Play', exact: true }).click()
+  await expect.poll(() => media.evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThan(2)
   // Dropping a new file replaces the selection without opening a picker.
   const transfer = await page.evaluateHandle(() => {
     const data = new DataTransfer()
-    data.items.add(new File(['RIFF0000WAVEtest'], 'dropped.wav', { type: 'audio/wav' }))
+    const audio = document.querySelector('audio')!
+    Reflect.set(window, '__oldPreviewAudio', audio)
+    data.items.add(new File(['RIFF0000WAVEtest'], 'a-very-long-recording-name-that-must-not-push-the-controls-outside-the-screen.wav', { type: 'audio/wav' }))
     return data
   })
   await page.locator('.drop-zone').dispatchEvent('dragover', { dataTransfer: transfer })
   await expect(page.locator('.drop-zone')).toHaveClass(/dragging/)
   await page.locator('.drop-zone').dispatchEvent('drop', { dataTransfer: transfer })
-  await expect(target).toContainText('dropped.wav')
+  await expect(page.locator('.filename')).toContainText('a-very-long-recording')
+  expect(await page.evaluate(() => (Reflect.get(window, '__oldPreviewAudio') as HTMLAudioElement).paused)).toBe(true)
   await expect(page.locator('.drop-zone')).not.toHaveClass(/dragging/)
   await transfer.dispose()
   await page.setViewportSize({ width: 390, height: 844 })
   const row = await page.locator('.drop-zone').boundingBox()
   expect(row!.x + row!.width).toBeLessThanOrEqual(390)
-  const mobileCreate = await create.boundingBox()
-  await page.getByLabel('Audio file', { exact: true }).setInputFiles({
-    name: 'a-very-long-recording-name-that-must-not-push-the-controls-outside-the-screen.wav',
-    mimeType: 'audio/wav', buffer: buildAudioWavFixture(1),
-  })
-  expect(await create.boundingBox()).toEqual(mobileCreate)
-  const picker = await target.boundingBox()
-  expect(picker!.x + picker!.width).toBeLessThanOrEqual(390)
+  const nameBounds = await page.locator('.filename').boundingBox()
+  const removeBounds = await page.getByRole('button', { name: 'Remove file', exact: true }).boundingBox()
+  expect(nameBounds!.x + nameBounds!.width).toBeLessThanOrEqual(removeBounds!.x)
+  await expect(page.locator('.filename')).toHaveAttribute('title', 'a-very-long-recording-name-that-must-not-push-the-controls-outside-the-screen.wav')
+  await expect(page.locator('.filename-tail')).toHaveText('reen.wav')
+  expect(await page.locator('.filename-start').evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+  const previewBox = await preview.boundingBox()
+  const fileBox = await page.locator('.file-info').boundingBox()
+  expect(previewBox!.x + previewBox!.width).toBeLessThanOrEqual(390)
+  expect(previewBox!.y - (fileBox!.y + fileBox!.height)).toBeGreaterThanOrEqual(24)
   // Remove must not open the picker underneath it.
   let pickersOpened = 0
   page.on('filechooser', () => { pickersOpened++ })
   await page.getByRole('button', { name: 'Remove file', exact: true }).click()
-  await expect(target).toContainText('Choose or drop a WAV file')
-  await expect(create).toBeDisabled()
-  expect(await create.boundingBox()).toEqual(mobileCreate)
+  await expect(target).toContainText('Choose a WAV file')
+  await expect(create).toHaveCount(0)
+  await expect(preview).toHaveCount(0)
   expect(pickersOpened).toBe(0)
+  expect(uploads).toEqual([])
+  // The empty note remains keyboard accessible after clearing.
+  const keyboardChooser = page.waitForEvent('filechooser')
+  await page.getByLabel('Audio file', { exact: true }).focus()
+  await page.keyboard.press('Enter')
+  await (await keyboardChooser).setFiles({ name: 'second.wav', mimeType: 'audio/wav', buffer: buildAudioWavFixture(1) })
+  await expect(create).toBeEnabled()
 })
 
 test('test_audio_studio_when_uploaded_then_renders_restores_and_seeks_native_reference_audio', async ({ page }) => {
@@ -95,9 +119,9 @@ test('test_audio_studio_when_uploaded_then_renders_restores_and_seeks_native_ref
   await page.goto('/')
   await page.waitForFunction(() => '__vue_app__' in (document.querySelector('#__nuxt') ?? {}))
   // Act
-  await expect(page.getByRole('button', { name: 'Chord Sheet Image', exact: true })).toBeDisabled()
+  await expect(page.getByRole('group', { name: 'Input source' })).toHaveCount(0)
   await page.getByLabel('Audio file', { exact: true }).setInputFiles({ name: '楓.wav', mimeType: 'audio/wav', buffer: wav })
-  await page.getByRole('button', { name: 'Create Score', exact: true }).click()
+  await page.getByRole('button', { name: 'Transcribe', exact: true }).click()
   // Assert
   await expect(page.getByRole('status')).toContainText('Separating piano')
   await expect(page.locator('.score-system svg').first()).toBeVisible()
@@ -127,7 +151,7 @@ test('test_audio_studio_when_uploaded_then_renders_restores_and_seeks_native_ref
   await page.setViewportSize({ width: 1280, height: 720 })
   expect(errors).toEqual([])
   await page.getByRole('button', { name: 'New Upload' }).click()
-  await expect(page.getByRole('button', { name: 'Chord Sheet Image' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Chord Sheet Image' })).toHaveCount(0)
 })
 
 test('test_audio_studio_when_transcription_fails_then_can_retry_and_cancel', async ({ page }) => {
@@ -150,7 +174,7 @@ test('test_audio_studio_when_transcription_fails_then_can_retry_and_cancel', asy
   await page.waitForFunction(() => '__vue_app__' in (document.querySelector('#__nuxt') ?? {}))
   await page.getByLabel('Audio file', { exact: true }).setInputFiles({ name: 'song.wav', mimeType: 'audio/wav', buffer: buildAudioWavFixture(1) })
   // Act & Assert
-  await page.getByRole('button', { name: 'Create Score', exact: true }).click()
+  await page.getByRole('button', { name: 'Transcribe', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Transcription failed')
   await page.getByRole('button', { name: 'Retry', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('Transcribing notes')

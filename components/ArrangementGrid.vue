@@ -7,7 +7,6 @@ import {
   resolveInitialPlaybackBpm,
 } from '~/shared/audio/playbackTempo'
 import type { ConfirmedChart } from '~/shared/schemas/chart'
-import { formatElapsedTime } from '~/shared/ui/elapsedTime'
 import { exportScoreAsPdf } from '~/shared/ui/scorePdf'
 
 const props = withDefaults(defineProps<{
@@ -48,12 +47,6 @@ const scoreDurationSeconds = computed(() =>
 const showPlaybackPosition = computed(() =>
   playbackStatus.value !== 'idle' || playbackPosition.value.elapsedSeconds > 0,
 )
-const playbackLabel = computed(() => ({
-  idle: 'Play',
-  loading: 'Loading',
-  paused: 'Play',
-  playing: 'Pause',
-})[playbackStatus.value])
 const playbackSourceLabel = computed(() =>
   playbackMode.value === 'reference' ? 'Original Piano' : 'Score',
 )
@@ -99,12 +92,11 @@ async function handleSeekMeasure(measureIndex: number, progress: number): Promis
   }
 }
 
-async function handleOverallSeek(event: Event): Promise<void> {
+async function handleOverallSeek(progress: number): Promise<void> {
   if (!currentVersion.value) {
     return
   }
 
-  const progress = Number((event.target as HTMLInputElement).value)
   await seekPlayback(
     currentVersion.value,
     playbackBpm.value,
@@ -170,43 +162,13 @@ function handleExportPdf(): void {
 
       <header class="score-controls">
         <div class="player-controls">
-          <div class="transport">
-            <button
-              class="play"
-              type="button"
-              :disabled="playbackStatus === 'loading'"
-              :aria-label="playbackLabel"
-              :title="playbackLabel"
-              @click="handlePlayback"
-            >
-              {{ playbackStatus === 'playing' ? 'Ⅱ' : '▶' }}
-            </button>
-            <button
-              class="stop"
-              type="button"
-              :disabled="playbackStatus === 'idle' && playbackPosition.elapsedSeconds === 0"
-              aria-label="Stop"
-              title="Stop"
-              @click="stopPlayback"
-            >
-              ■
-            </button>
-          </div>
-
-          <input
-            class="overall-progress"
-            type="range"
-            min="0"
-            max="1"
-            step="0.001"
-            :value="playbackPosition.progress"
-            aria-label="Playback progress"
-            @change="handleOverallSeek"
-          >
-          <time>
-            {{ formatElapsedTime(playbackPosition.elapsedSeconds) }}
-            / {{ formatElapsedTime(playbackPosition.totalDurationSeconds || scoreDurationSeconds) }}
-          </time>
+          <PlaybackControls
+            class="score-playback" :status="playbackStatus" :progress="playbackPosition.progress"
+            :elapsed-seconds="playbackPosition.elapsedSeconds"
+            :duration-seconds="playbackPosition.totalDurationSeconds || scoreDurationSeconds"
+            show-stop :stop-disabled="playbackStatus === 'idle' && playbackPosition.elapsedSeconds === 0"
+            @toggle="handlePlayback" @stop="stopPlayback" @seek="handleOverallSeek"
+          />
 
           <details
             v-if="props.referenceAudio"
@@ -363,8 +325,7 @@ function handleExportPdf(): void {
   border-radius: 7px;
   background: #e7e7ea;
 }
-.version-switcher button,
-.transport button {
+.version-switcher button {
   height: 30px;
   border: 0;
   border-radius: 6px;
@@ -380,7 +341,6 @@ function handleExportPdf(): void {
 .version-switcher button:focus-visible,
 .playback-source-menu summary:focus-visible,
 .playback-source-options button:focus-visible,
-.transport button:focus-visible,
 .download-button:focus-visible {
   outline: 2px solid #007aff;
   outline-offset: 2px;
@@ -393,20 +353,7 @@ function handleExportPdf(): void {
   align-items: center;
   column-gap: 10px;
 }
-.transport { display: flex; gap: 4px; }
-.transport button {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border-radius: 50%;
-  padding: 0;
-}
-.transport .play { background: #1d1d1f; color: #fff; }
-.transport .stop { border: 1px solid rgba(0,0,0,.16); background: #fff; color: #4c4c50; font-size: 10px; }
-.transport button:disabled { color: #aeaeb2; cursor: default; }
-.overall-progress { width: 100%; accent-color: #1d1d1f; }
-time { color: #6e6e73; font-size: .72rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.score-playback { grid-column: 1 / -1; }
 .playback-source-menu,
 .playback-source-label {
   position: relative;
@@ -487,7 +434,6 @@ time { color: #6e6e73; font-size: .72rem; font-variant-numeric: tabular-nums; wh
   }
   .score-controls { height: auto; grid-template-columns: minmax(0, 1fr) auto; }
   .player-controls { grid-column: 1 / -1; grid-template-columns: auto minmax(64px, 1fr) auto; }
-  .overall-progress { min-width: 0; margin: 0; }
   .score-controls :deep(.tempo-control) { grid-column: 1; grid-row: 2; justify-self: start; }
   .version-switcher { grid-column: 2; grid-row: 2; justify-self: end; }
   .score-stage { padding: 12px; }

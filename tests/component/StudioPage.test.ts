@@ -30,12 +30,9 @@ test('test_StudioPage_when_opened_then_uses_english_and_blocks_image_entry', asy
 
   // Assert
   expect(wrapper.findComponent({ name: 'AudioScoreWorkspace' }).exists()).toBe(true)
-  expect(wrapper.get('.source-heading h1').text()).toBe('Create Piano Score')
-  expect(wrapper.get('[aria-label="Input source"] button:first-child').text()).toBe('Audio File')
-  const images = wrapper.get('[aria-label="Input source"] button:last-child')
-  expect(images.text()).toBe('Chord Sheet Image')
-  expect(images.attributes('disabled')).toBeDefined()
-  await images.trigger('click')
+  expect(wrapper.find('.source-heading').exists()).toBe(false)
+  expect(wrapper.find('[aria-label="Input source"]').exists()).toBe(false)
+  expect(wrapper.text()).not.toContain('Chord Sheet Image')
   expect(wrapper.findComponent({ name: 'UploadPanel' }).exists()).toBe(false)
   expect(wrapper.find('[aria-label="Workspace view"]').exists()).toBe(false)
   expect(wrapper.find('[data-test="chart-comparison"]').exists()).toBe(false)
@@ -51,7 +48,7 @@ test('test_StudioPage_when_saved_chart_exists_then_keeps_image_workspace_locked'
   // Assert
   expect(wrapper.find('[data-test="chart-comparison"]').exists()).toBe(false)
   expect(wrapper.find('[aria-label="Workspace view"]').exists()).toBe(false)
-  expect(wrapper.get('[aria-label="Input source"] button:first-child').attributes('aria-pressed')).toBe('true')
+  expect(wrapper.find('[aria-label="Input source"]').exists()).toBe(false)
 })
 
 test('test_StudioPage_when_saved_score_exists_then_keeps_image_workspace_locked', async () => {
@@ -65,7 +62,7 @@ test('test_StudioPage_when_saved_score_exists_then_keeps_image_workspace_locked'
   // Assert
   expect(wrapper.find('[data-test="arrangement-grid"]').exists()).toBe(false)
   expect(wrapper.find('[aria-label="Workspace view"]').exists()).toBe(false)
-  expect(wrapper.get('[aria-label="Input source"] button:first-child').attributes('aria-pressed')).toBe('true')
+  expect(wrapper.find('[aria-label="Input source"]').exists()).toBe(false)
 })
 
 async function mountStudioPage() {

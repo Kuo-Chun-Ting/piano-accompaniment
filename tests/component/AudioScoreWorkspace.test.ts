@@ -13,7 +13,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 async function mountAudio() {
-  return mountSuspended(AudioScoreWorkspace, { global: { stubs: { AudioScoreResult: true } } })
+  return mountSuspended(AudioScoreWorkspace, { global: { stubs: { AudioScoreResult: true, AudioFilePreview: true } } })
 }
 
 async function chooseFile(wrapper: Awaited<ReturnType<typeof mountAudio>>, name: string) {
@@ -29,44 +29,41 @@ test('test_AudioScoreWorkspace_when_non_wav_selected_then_blocks_submit', async 
   await chooseFile(wrapper, 'song.mp3')
   // Assert
   expect(wrapper.get('[role=alert]').text()).toContain('WAV')
-  expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeDefined()
+  expect(wrapper.find('[data-test=start-transcription]').exists()).toBe(false)
   expect(fetchMock).not.toHaveBeenCalled()
   wrapper.unmount()
 })
 
-test('test_AudioScoreWorkspace_when_empty_then_shows_picker_and_disabled_create_action', async () => {
+test('test_AudioScoreWorkspace_when_empty_then_shows_note_picker_with_limit_inside', async () => {
   // Arrange & Act
   const wrapper = await mountAudio()
   // Assert
   expect(wrapper.get('.drop-zone input[type=file]').attributes('aria-label')).toBe('Audio file')
-  expect(wrapper.get('.drop-zone').text()).toContain('Choose or drop a WAV file')
+  expect(wrapper.get('.drop-zone').text()).toContain('Choose a WAV file')
   expect(wrapper.find('[aria-label="Remove file"]').exists()).toBe(false)
-  expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeDefined()
+  expect(wrapper.get('.note-head').text()).toContain('Max 100 MB')
+  expect(wrapper.find('[data-test=start-transcription]').exists()).toBe(false)
   wrapper.unmount()
 })
 
-test('test_AudioScoreWorkspace_when_file_selected_then_keeps_picker_and_create_in_place', async () => {
+test('test_AudioScoreWorkspace_when_file_selected_then_note_becomes_transcribe_without_uploading', async () => {
   // Arrange
   const wrapper = await mountAudio()
   const row = wrapper.get('.drop-zone').element
-  const picker = wrapper.get('input[type=file]').element
-  const create = wrapper.get('[data-test=start-transcription]').element
   // Act
   await chooseFile(wrapper, '楓.wav')
   // Assert
   expect(wrapper.get('.drop-zone').element).toBe(row)
-  expect(wrapper.get('input[type=file]').element).toBe(picker)
-  expect(wrapper.get('[data-test=start-transcription]').element).toBe(create)
-  expect(wrapper.get('.drop-zone').text()).toContain('楓.wav')
+  expect(wrapper.get('.file-info').text()).toContain('楓.wav')
   expect(wrapper.find('[aria-label="Remove file"]').exists()).toBe(true)
   expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeUndefined()
-  expect(wrapper.get('[data-test=start-transcription]').text()).toBe('Create Score')
+  expect(wrapper.get('[data-test=start-transcription]').text()).toBe('Transcribe')
   expect(fetchMock).not.toHaveBeenCalled()
   // Act
-  await chooseFile(wrapper, '安靜.wav')
+  await wrapper.get('.drop-zone').trigger('drop', { dataTransfer: { files: [new File(['audio'], '安靜.wav')] } })
   // Assert
-  expect(wrapper.get('.drop-zone').text()).toContain('安靜.wav')
-  expect(wrapper.get('.drop-zone').text()).not.toContain('楓.wav')
+  expect(wrapper.get('.file-info').text()).toContain('安靜.wav')
+  expect(wrapper.get('.file-info').text()).not.toContain('楓.wav')
   wrapper.unmount()
 })
 
@@ -77,7 +74,7 @@ test('test_AudioScoreWorkspace_when_wav_dropped_then_selects_file_without_starti
   // Act
   await wrapper.get('.drop-zone').trigger('drop', { dataTransfer: { files: [file] } })
   // Assert
-  expect(wrapper.get('.drop-zone').text()).toContain('dropped.wav')
+  expect(wrapper.get('.file-info').text()).toContain('dropped.wav')
   expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeUndefined()
   expect(fetchMock).not.toHaveBeenCalled()
   wrapper.unmount()
@@ -90,8 +87,8 @@ test('test_AudioScoreWorkspace_when_file_removed_then_returns_to_empty_without_s
   // Act
   await wrapper.get('[aria-label="Remove file"]').trigger('click')
   // Assert
-  expect(wrapper.get('.drop-zone').text()).toContain('Choose or drop a WAV file')
-  expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeDefined()
+  expect(wrapper.get('.drop-zone').text()).toContain('Choose a WAV file')
+  expect(wrapper.find('[data-test=start-transcription]').exists()).toBe(false)
   expect(wrapper.find('[aria-label="Remove file"]').exists()).toBe(false)
   expect(fetchMock).not.toHaveBeenCalled()
   wrapper.unmount()
@@ -120,9 +117,9 @@ test('test_AudioScoreWorkspace_when_busy_then_blocks_replacement_and_removal', a
     dataTransfer: { files: [new File(['RIFF0000WAVEtest'], 'replacement.wav')] },
   })
   // Assert
-  expect(wrapper.get('input[type=file]').attributes('disabled')).toBeDefined()
+  expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeDefined()
   expect(wrapper.find('[aria-label="Remove file"]').exists()).toBe(false)
-  expect(wrapper.get('.drop-zone').text()).toContain('楓.wav')
+  expect(wrapper.get('.file-info').text()).toContain('楓.wav')
   wrapper.unmount()
 })
 
@@ -182,6 +179,22 @@ test('test_AudioScoreWorkspace_when_saved_job_no_longer_exists_then_allows_new_u
   // Act
   await chooseFile(wrapper, 'new.wav')
   // Assert
+  expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeUndefined()
+  expect(sessionStorage.getItem('audio-score-job')).toBeNull()
+  wrapper.unmount()
+})
+
+test.each(['failed', 'cancelled'])('test_AudioScoreWorkspace_when_restored_job_is_%s_then_can_clear_and_choose_again', async status => {
+  // Arrange
+  sessionStorage.setItem('audio-score-job', 'old-job')
+  fetchMock.mockResolvedValue({ id: 'old-job', title: 'Old song', status, stage: 'transcribe-midi' })
+  const wrapper = await mountAudio()
+  await flushPromises()
+  // Act
+  await wrapper.get('[aria-label="Remove file"]').trigger('click')
+  await chooseFile(wrapper, 'new.wav')
+  // Assert
+  expect(wrapper.get('.file-info').text()).toContain('new.wav')
   expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeUndefined()
   expect(sessionStorage.getItem('audio-score-job')).toBeNull()
   wrapper.unmount()

@@ -1,130 +1,106 @@
 # Piano Accompaniment Studio
 
-Piano Accompaniment Studio uses AI to create editable, playable piano accompaniment scores.
+Piano Accompaniment Studio uses AI to help users create and play piano accompaniment scores.
 
 ## Background
 
-Many songs are available only as guitar chord-sheet images. Converting them into piano accompaniment requires transcription, music theory, and arrangement work. This project uses AI to extract the chart, lets the user correct the result, and generates a simple score that can be played or exported.
+Many piano learners can play from sheet music but struggle to learn songs by ear. Identifying chords and arranging an accompaniment that sounds like the original takes substantial effort, which can make learners give up. This project aims to make that experience accessible without requiring those skills.
 
 ## Goal
 
-The goal is to let users name a song, describe the accompaniment they want in natural language, and receive a piano score they can edit, play, and export without arranging it manually.
+Let users specify a song title and artist, then have the application find the song and turn it into piano sheet music. Users should not need to prepare screenshots or recordings themselves.
 
 ## Current MVP
 
-Use **Audio File** on the homepage to transcribe WAV recordings into piano scores. **Chord Sheet Image** is temporarily disabled; its implementation is retained.
+Choose a WAV recording on the homepage to transcribe it into a piano score.
 
 ## Features
 
-- Upload a WAV recording, follow transcription progress, and play the result as Score or Original Piano with tempo control and seeking.
-- Upload one or more chord-sheet images and choose an OpenAI model for chart extraction.
-- Review and edit chords, beat durations, lyrics, and measures before generating a score.
-- Add, delete, and reorder chords or measures with undo and redo support.
-- Generate a piano score, adjust playback tempo, seek through the arrangement, and export it as PDF.
-- Restore the current workspace from browser session storage.
+- Upload a WAV file up to 100 MB and follow transcription progress.
+- Preview the selected recording locally before uploading; clear it with × to choose another file.
+- View the piano score and export it as PDF.
+- Play the generated score or the separated piano audio (**Original Piano**), with seeking and tempo control.
+- Cancel transcription or reconnect after refreshing while the server remains running.
 
 ## Current Architecture
 
 ```mermaid
 flowchart LR
-    User[User] --> App[Nuxt application]
-    App -->|WAV upload| Job[Local transcription job]
-    Job -->|Existing Python models + TypeScript pipeline| AudioScore[Score data + piano WAV]
-    AudioScore --> Score[VexFlow score]
-    AudioScore --> Playback[Shared player]
-    App -->|Images and selected model| API[Nuxt server API]
-    API -->|Structured extraction request| OpenAI[OpenAI Responses API]
-    OpenAI -->|Validated chart data| App
-    App --> Editor[Editable chord chart]
-    Editor --> Arrangement[Arrangement engine]
-    Arrangement --> Score[VexFlow score]
-    Arrangement --> Playback
+    Upload[WAV upload] --> Server[Nuxt server]
+    Server --> Models[Python models: separate piano and transcribe]
+    Models --> Pipeline[TypeScript: convert notes into score data]
+    Pipeline --> Score[VexFlow sheet music]
+    Pipeline --> Player[Score playback]
+    Models --> Piano[Original Piano playback]
 ```
 
-The server sends uploaded images to the OpenAI Responses API and validates the structured result with Zod. The browser editor is the source of truth after extraction, so users can correct recognition errors before arrangement generation. The arrangement engine converts confirmed four-beat measures into deterministic piano events used by both score rendering and playback.
+Nuxt runs the website and starts the local transcription pipeline. Python models process the recording; TypeScript prepares the notation and playback data.
 
-**Stack:** Nuxt 3, Vue 3, TypeScript, OpenAI Responses API, Zod, VexFlow, Web Audio API, Vitest, and Playwright.
-
-## Current Design Trade-offs
-
-| Decision | Benefit | Limitation |
-| --- | --- | --- |
-| AI chart extraction | Reduces manual transcription | Results are non-deterministic and require review |
-| Editable intermediate chart | Recognition errors can be fully corrected | Adds a review step before score generation |
-| Deterministic arrangement patterns | Produces predictable notation and playback | Provides less musical variation than manual arrangement |
-| Browser session storage | Requires no account or database | Work is not synchronized across devices or browser sessions |
+**Stack:** Nuxt 3, Vue 3, TypeScript, Python, ffmpeg, Zod, VexFlow, Web Audio API, Vitest, and Playwright.
 
 ## Setup
 
+Run commands from the project root. Install Node.js and npm, then:
+
 ```bash
 npm install
-cp .env.example .env
 ```
 
-Add an OpenAI API key to `.env`:
+Audio transcription also requires `ffmpeg` on PATH, a Python virtual environment, and downloaded model files. `npm install` does not install these. No OpenAI API key is needed for audio transcription.
 
-```dotenv
-NUXT_OPENAI_API_KEY=your_api_key
-```
+The pipeline expects `venv/` and `models/` inside this runtime directory:
+
+- macOS: `~/Library/Application Support/Piano Accompaniment/audio-score/`
+- Linux: `~/.local/share/piano-accompaniment/audio-score/`
+
+Python dependencies are listed in [requirements.txt](scripts/audio-score/requirements.txt). Required model checkpoints and caches are defined in [runtime.ts](shared/audio-transcription/runtime.ts). There is no automated runtime and model installer yet; a fresh clone cannot transcribe until these dependencies are installed.
 
 Start the development server:
 
 ```bash
-npm run dev
+npm run dev -- --port 3200
 ```
 
-Open the local URL shown by Nuxt. Click the upload area or drop a WAV (up to 100 MB), then select **Create Score**. Click or drop again to replace the file; use × to remove it. The image workflow is currently unavailable.
+Open [http://localhost:3200/](http://localhost:3200/), choose or drop a WAV file, then select **Transcribe**. Keep the terminal running; press `Ctrl+C` to stop.
 
-Audio transcription runs on the Node server using the existing local Python/model installation and `ffmpeg`, just like `npm run audio:score`. An OpenAI key is needed only for image extraction. This is a local, single-server MVP—not a serverless or authenticated public service. Run commands from the project root, with development dependencies installed.
+The website handles transcription and audio playback. No separate preview server is needed.
 
-Only one recording is processed at a time. Refreshing the browser reconnects to the job while the server remains running. Cancelling stops that job's model processes; restarting the server stops active jobs and clears its job list. Uploaded recordings, generated files, and `pipeline.log` are stored under `.data/audio-scores/<job-id>/` (ignored by Git; no automatic deletion).
+## Audio-to-score CLI
 
-The website serves its own audio with byte-range support. It does **not** need the separate preview server below.
-
-## Audio-to-score MVP
-
-Run the MVP with one WAV path:
+These tools are for pipeline development and inspecting generated files, not for starting the website.
 
 ```bash
-npm run audio:score -- "/absolute/path/to/recording.wav"
+npm run audio:score -- "./recording.wav"
 ```
 
-The command creates or overwrites `.audio-score/<recording-name>/` beside the WAV file.
-
-Serve the project directory to view and play generated scores:
+This creates or overwrites `.audio-score/recording/` beside the WAV file. To preview that output when the WAV is in the project root, stop the website and run:
 
 ```bash
 npm run audio:score:serve
 ```
 
-Open `http://127.0.0.1:3200/.audio-score/<recording-name>/index.html`.
+Open `http://127.0.0.1:3200/.audio-score/recording/index.html`. This server only serves files inside the project directory; outputs beside WAV files elsewhere are not available at that URL.
 
-Project samples:
-
-```bash
-npm run audio:score -- "./安靜.wav"
-npm run audio:score -- "./楓.wav"
-npm run audio:score:verify
-```
+For local fixture verification, rebuild `安靜.wav` and `楓.wav` from the project root, then run `npm run audio:score:verify`. These recordings are not included in Git.
 
 ## Testing
 
 ```bash
 npm test
+npm run typecheck
 npm run test:e2e
-npm run test:e2e:live
 ```
 
-- `npm test` runs unit and component tests.
-- `npm run test:e2e` runs Playwright with a stubbed AI API.
-- `npm run test:e2e:live` runs the complete flow against the real OpenAI API and requires `NUXT_OPENAI_API_KEY`.
+`npm test` runs unit and component tests. E2E tests use stubbed transcription responses; they do not verify the real models. Stop any service on port 3200 before running E2E tests so Playwright can start its test server.
 
 ## Current Limitations
 
-- Chart extraction depends on image quality and model output.
-- Generated charts currently use 4/4 time and can be normalized to C major or A minor.
-- The arrangement engine is intended for simple MVP accompaniment rather than professional composition.
-- Piano playback downloads audio samples from an external CDN.
+- One recording is processed at a time; additional requests are rejected rather than queued.
+- Transcription can misidentify notes, repeated strikes, and sustain. Note editing is not available yet.
+- Jobs time out after 30 minutes. Restarting the server clears its in-memory job list.
+- Uploads, results, and logs remain in `.data/audio-scores/<job-id>/`. They are ignored by Git and are not automatically deleted.
+- This is a local, single-server MVP without user authentication or cross-device job history.
+- Score playback loads piano samples from an external CDN.
 
 ## Documentation
 
