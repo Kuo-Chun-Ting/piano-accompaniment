@@ -1,16 +1,15 @@
 import { expect, test } from '@playwright/test'
 import { buildAudioScoreFixture, buildAudioWavFixture } from '../fixtures/audioScore'
 
-test('test_audio_studio_when_note_selected_then_previews_locally_and_clears_without_upload', async ({ page }) => {
+test('test_audio_studio_when_file_selected_then_previews_locally_and_clears_without_upload', async ({ page }) => {
   // Arrange
   const uploads: string[] = []
   page.on('request', request => { if (request.method() === 'POST') uploads.push(request.url()) })
   await page.goto('/')
   await page.waitForFunction(() => '__vue_app__' in (document.querySelector('#__nuxt') ?? {}))
   const create = page.getByRole('button', { name: 'Transcribe', exact: true })
-  const target = page.locator('.note-head')
+  const target = page.locator('.file-picker')
   await expect(create).toHaveCount(0)
-  const initialPicker = await target.boundingBox()
   await expect(target).toContainText('Max 100 MB')
   // Act: choose a real WAV, without submitting it to the server.
   const chooserPromise = page.waitForEvent('filechooser')
@@ -19,7 +18,7 @@ test('test_audio_studio_when_note_selected_then_previews_locally_and_clears_with
   // Assert
   await expect(page.locator('.file-info')).toContainText('first.wav')
   await expect(create).toBeEnabled()
-  expect(await create.boundingBox()).toEqual(initialPicker)
+  expect((await create.boundingBox())!.y).toBeGreaterThan((await page.locator('.drop-zone').boundingBox())!.y)
   const preview = page.getByRole('region', { name: 'Audio preview' })
   const media = preview.locator('audio')
   await expect(preview.getByRole('button', { name: 'Play', exact: true })).toBeEnabled()
@@ -56,6 +55,7 @@ test('test_audio_studio_when_note_selected_then_previews_locally_and_clears_with
   await expect(page.locator('.drop-zone')).not.toHaveClass(/dragging/)
   await transfer.dispose()
   await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByRole('heading', { name: 'Piano Accompaniment Studio', exact: true })).toBeVisible()
   const row = await page.locator('.drop-zone').boundingBox()
   expect(row!.x + row!.width).toBeLessThanOrEqual(390)
   const nameBounds = await page.locator('.filename').boundingBox()
@@ -67,7 +67,7 @@ test('test_audio_studio_when_note_selected_then_previews_locally_and_clears_with
   const previewBox = await preview.boundingBox()
   const fileBox = await page.locator('.file-info').boundingBox()
   expect(previewBox!.x + previewBox!.width).toBeLessThanOrEqual(390)
-  expect(previewBox!.y - (fileBox!.y + fileBox!.height)).toBeGreaterThanOrEqual(24)
+  expect(previewBox!.y - (fileBox!.y + fileBox!.height)).toBeGreaterThanOrEqual(12)
   // Remove must not open the picker underneath it.
   let pickersOpened = 0
   page.on('filechooser', () => { pickersOpened++ })
@@ -123,7 +123,7 @@ test('test_audio_studio_when_uploaded_then_renders_restores_and_seeks_native_ref
   await page.getByLabel('Audio file', { exact: true }).setInputFiles({ name: '楓.wav', mimeType: 'audio/wav', buffer: wav })
   await page.getByRole('button', { name: 'Transcribe', exact: true }).click()
   // Assert
-  await expect(page.getByRole('status')).toContainText('Separating piano')
+  await expect(page.getByRole('status')).toContainText('Transcribing')
   await expect(page.locator('.score-system svg').first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Rich', exact: true })).toHaveCount(0)
   // Act: restore and seek from early playback directly to the tenth measure.
@@ -177,7 +177,42 @@ test('test_audio_studio_when_transcription_fails_then_can_retry_and_cancel', asy
   await page.getByRole('button', { name: 'Transcribe', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Transcription failed')
   await page.getByRole('button', { name: 'Retry', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText('Transcribing notes')
+  await expect(page.getByRole('status')).toContainText('Transcribing')
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText('cancelled')
+  await expect(page.getByRole('status')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Transcribe', exact: true })).toBeEnabled()
+})
+
+test('test_audio_studio_when_dragging_during_transcription_then_keeps_preview_interactive', async ({ page }) => {
+  // Arrange: real browser audio and pointer events, only the model job is stubbed.
+  await page.route('**/api/audio-scores', route => route.fulfill({ status: 202, json: { id: 'playing', title: 'song', status: 'running', stage: 'starting' } }))
+  await page.route('**/api/audio-scores/playing', route => route.fulfill({ json: { id: 'playing', title: 'song', status: 'running', stage: 'transcribe-midi' } }))
+  await page.goto('/')
+  await page.waitForFunction(() => '__vue_app__' in (document.querySelector('#__nuxt') ?? {}))
+  await page.getByLabel('Audio file', { exact: true }).setInputFiles({ name: 'song.wav', mimeType: 'audio/wav', buffer: buildAudioWavFixture(30) })
+  const preview = page.getByRole('region', { name: 'Audio preview' })
+  const media = preview.locator('audio')
+  const slider = preview.getByLabel('Playback progress')
+  await preview.getByRole('button', { name: 'Play', exact: true }).click()
+  await expect.poll(() => media.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThan(0)
+  // Act: starting a job must not interrupt playback.
+  await page.getByRole('button', { name: 'Transcribe', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('Transcribing')
+  await expect(preview.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled()
+  for (const fraction of [0.8, 0.2]) {
+    const box = (await slider.boundingBox())!
+    const current = Number(await slider.inputValue())
+    await page.mouse.move(box.x + 8 + current * (box.width - 16), box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 8 + fraction * (box.width - 16), box.y + box.height / 2, { steps: 15 })
+    // Hold longer than multiple media timeupdate events: the previous bug overwrote the thumb here.
+    await page.waitForTimeout(1200)
+    expect(Number(await slider.inputValue())).toBeCloseTo(fraction, 1)
+    await page.mouse.up()
+    await expect.poll(() => media.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThan(fraction * 30 - 1)
+    expect(await media.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeLessThan(fraction * 30 + 2)
+  }
+  // Assert: pause is still available while the job runs.
+  await preview.getByRole('button', { name: 'Pause', exact: true }).click()
+  expect(await media.evaluate((a: HTMLAudioElement) => a.paused)).toBe(true)
 })

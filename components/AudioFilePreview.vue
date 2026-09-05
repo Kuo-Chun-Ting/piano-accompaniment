@@ -74,7 +74,7 @@ function onError(): void {
 </template>
 
 <style scoped>
-.audio-preview { width: 300px; max-width: 100%; margin: 30px auto 0; }
+.audio-preview { width: 100%; margin: 16px auto 0; }
 audio { display: none; }
 p { color: #b42318; font-size: 12px; line-height: 1.5; margin: 10px 0 0; }
 </style>

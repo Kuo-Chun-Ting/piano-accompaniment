@@ -55,7 +55,7 @@ test('test_AudioFilePreview_when_play_rejected_then_shows_recoverable_error', as
   wrapper.unmount()
 })
 
-test('test_AudioFilePreview_when_transcription_starts_then_pauses_preview', async () => {
+test('test_AudioFilePreview_when_disabled_then_pauses_preview', async () => {
   // Arrange
   const wrapper = await mountPreview()
   await wrapper.get('audio').trigger('play')
@@ -90,7 +90,7 @@ test('test_AudioFilePreview_when_media_invalid_then_disables_preview_without_tra
   wrapper.unmount()
 })
 
-test.each(['replace', 'transcribe'])('test_AudioFilePreview_when_pending_play_interrupted_by_%s_then_ignores_stale_error', async action => {
+test.each(['replace', 'disable'])('test_AudioFilePreview_when_pending_play_interrupted_by_%s_then_ignores_stale_error', async action => {
   // Arrange
   let rejectPlay!: (error: Error) => void
   vi.mocked(HTMLMediaElement.prototype.play).mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectPlay = reject }))

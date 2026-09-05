@@ -34,19 +34,19 @@ test('test_AudioScoreWorkspace_when_non_wav_selected_then_blocks_submit', async 
   wrapper.unmount()
 })
 
-test('test_AudioScoreWorkspace_when_empty_then_shows_note_picker_with_limit_inside', async () => {
+test('test_AudioScoreWorkspace_when_empty_then_shows_file_picker_without_submit', async () => {
   // Arrange & Act
   const wrapper = await mountAudio()
   // Assert
   expect(wrapper.get('.drop-zone input[type=file]').attributes('aria-label')).toBe('Audio file')
   expect(wrapper.get('.drop-zone').text()).toContain('Choose a WAV file')
   expect(wrapper.find('[aria-label="Remove file"]').exists()).toBe(false)
-  expect(wrapper.get('.note-head').text()).toContain('Max 100 MB')
+  expect(wrapper.get('.file-picker').text()).toContain('Max 100 MB')
   expect(wrapper.find('[data-test=start-transcription]').exists()).toBe(false)
   wrapper.unmount()
 })
 
-test('test_AudioScoreWorkspace_when_file_selected_then_note_becomes_transcribe_without_uploading', async () => {
+test('test_AudioScoreWorkspace_when_file_selected_then_keeps_picker_separate_from_submit', async () => {
   // Arrange
   const wrapper = await mountAudio()
   const row = wrapper.get('.drop-zone').element
@@ -58,6 +58,8 @@ test('test_AudioScoreWorkspace_when_file_selected_then_note_becomes_transcribe_w
   expect(wrapper.find('[aria-label="Remove file"]').exists()).toBe(true)
   expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeUndefined()
   expect(wrapper.get('[data-test=start-transcription]').text()).toBe('Transcribe')
+  expect(wrapper.find('input[type=file]').exists()).toBe(true)
+  expect(wrapper.get('.drop-zone').find('[data-test=start-transcription]').exists()).toBe(false)
   expect(fetchMock).not.toHaveBeenCalled()
   // Act
   await wrapper.get('.drop-zone').trigger('drop', { dataTransfer: { files: [new File(['audio'], '安靜.wav')] } })
@@ -117,7 +119,7 @@ test('test_AudioScoreWorkspace_when_busy_then_blocks_replacement_and_removal', a
     dataTransfer: { files: [new File(['RIFF0000WAVEtest'], 'replacement.wav')] },
   })
   // Assert
-  expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeDefined()
+  expect(wrapper.get('input[type=file]').attributes('disabled')).toBeDefined()
   expect(wrapper.find('[aria-label="Remove file"]').exists()).toBe(false)
   expect(wrapper.get('.file-info').text()).toContain('楓.wav')
   wrapper.unmount()
@@ -140,7 +142,7 @@ test('test_AudioScoreWorkspace_when_upload_fails_then_shows_error_and_allows_ret
   wrapper.unmount()
 })
 
-test('test_AudioScoreWorkspace_when_existing_job_restored_then_displays_actual_stage_and_can_cancel', async () => {
+test('test_AudioScoreWorkspace_when_existing_job_restored_then_displays_processing_and_can_cancel', async () => {
   // Arrange
   sessionStorage.setItem('audio-score-job', 'job-1')
   fetchMock.mockResolvedValue({ id: 'job-1', title: '楓', status: 'running', stage: 'separate-piano' })
@@ -151,8 +153,87 @@ test('test_AudioScoreWorkspace_when_existing_job_restored_then_displays_actual_s
   await cancel.trigger('click')
   await flushPromises()
   // Assert
-  expect(wrapper.get('[role=status]').text()).toContain('Separating piano')
+  expect(wrapper.get('[role=status]').text()).toContain('Cancelling')
   expect(fetchMock).toHaveBeenCalledWith('/api/audio-scores/job-1', expect.objectContaining({ method: 'DELETE' }))
+  wrapper.unmount()
+})
+
+test('test_AudioScoreWorkspace_when_restoring_pending_job_then_shows_processing_feedback', async () => {
+  // Arrange
+  sessionStorage.setItem('audio-score-job', 'pending')
+  fetchMock.mockImplementation(() => new Promise(() => {}))
+  // Act
+  const wrapper = await mountAudio()
+  // Assert
+  expect(wrapper.get('[role=status]').text()).toContain('Transcribing')
+  expect(wrapper.findAll('button').some(button => button.text() === 'Cancel')).toBe(true)
+  wrapper.unmount()
+})
+
+test('test_AudioScoreWorkspace_when_cancel_accepted_but_worker_running_then_waits_for_terminal_status', async () => {
+  // Arrange
+  vi.useFakeTimers()
+  sessionStorage.setItem('audio-score-job', 'stopping')
+  let stopped = false
+  fetchMock.mockImplementation(() => Promise.resolve({ id: 'stopping', title: 'Song', status: stopped ? 'cancelled' : 'running', stage: 'transcribe-midi' }))
+  const wrapper = await mountAudio()
+  await flushPromises()
+  try {
+    // Act
+    const cancel = wrapper.findAll('button').find(button => button.text() === 'Cancel')!
+    await cancel.trigger('click')
+    await flushPromises()
+    // Assert
+    expect(wrapper.get('[role=status]').text()).toContain('Cancelling')
+    expect(cancel.attributes('disabled')).toBeDefined()
+    stopped = true
+    await vi.advanceTimersByTimeAsync(1000)
+    await flushPromises()
+    expect(wrapper.find('[role=status]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Remove file"]').exists()).toBe(true)
+  } finally {
+    wrapper.unmount()
+    vi.useRealTimers()
+  }
+})
+
+test('test_AudioScoreWorkspace_when_invalid_replacement_dropped_then_preserves_selected_file', async () => {
+  // Arrange
+  const wrapper = await mountAudio()
+  await chooseFile(wrapper, '楓.wav')
+  // Act
+  await wrapper.get('.drop-zone').trigger('drop', { dataTransfer: { files: [new File(['bad'], 'bad.mp3')] } })
+  // Assert
+  expect(wrapper.get('.file-info').text()).toContain('楓.wav')
+  expect(wrapper.get('[role=alert]').text()).toContain('WAV')
+  expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeUndefined()
+  wrapper.unmount()
+})
+
+test('test_AudioScoreWorkspace_when_transcribing_then_keeps_preview_enabled_and_cancel_acknowledged', async () => {
+  // Arrange
+  const wrapper = await mountAudio()
+  await chooseFile(wrapper, '楓.wav')
+  let resolveCancel!: (value: unknown) => void
+  let cancelled = false
+  fetchMock.mockImplementation((_url, options) => {
+    if (options?.method === 'DELETE') return new Promise(resolve => { resolveCancel = resolve })
+    return Promise.resolve({ id: 'job-1', title: '楓', status: cancelled ? 'cancelled' : 'running', stage: 'separate-piano' })
+  })
+  // Act
+  await wrapper.get('[data-test=start-transcription]').trigger('click')
+  await flushPromises()
+  // Assert
+  expect(wrapper.findComponent({ name: 'AudioFilePreview' }).props('disabled')).toBe(false)
+  const cancel = wrapper.findAll('button').find(button => button.text() === 'Cancel')!
+  await cancel.trigger('click')
+  expect(wrapper.get('[role=status]').text()).toContain('Cancelling')
+  expect(cancel.attributes('disabled')).toBeDefined()
+  cancelled = true
+  resolveCancel({})
+  await flushPromises()
+  expect(wrapper.find('[role=status]').exists()).toBe(false)
+  expect(wrapper.get('[data-test=start-transcription]').attributes('disabled')).toBeUndefined()
   wrapper.unmount()
 })
 

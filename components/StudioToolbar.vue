@@ -98,6 +98,7 @@ h1 {
   .view-switcher { grid-row: 2; grid-column: 1 / -1; justify-self: center; }
 }
 @media (max-width: 560px) {
-  .brand h1 { display: none; }
+  .brand { grid-column: 1 / -1; }
+  .brand h1 { font-size: 13px; }
 }
 </style>

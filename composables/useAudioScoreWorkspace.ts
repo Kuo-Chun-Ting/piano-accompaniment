@@ -8,7 +8,8 @@ export function useAudioScoreWorkspace() {
   const error = ref('')
   const uploading = ref(false)
   const reconnecting = ref(false)
-  const busy = computed(() => uploading.value || job.value?.status === 'running' || job.value?.status === 'uploading')
+  const cancelling = ref(false)
+  const busy = computed(() => cancelling.value || uploading.value || job.value?.status === 'running' || job.value?.status === 'uploading')
   let timer: ReturnType<typeof setTimeout> | undefined
   let request: AbortController | undefined
   let disposed = false
@@ -22,10 +23,16 @@ export function useAudioScoreWorkspace() {
 
   function selectFile(value: File | undefined): void {
     if (busy.value || !value) return
+    if (!value.name.toLowerCase().endsWith('.wav')) {
+      error.value = 'Choose a WAV file.'
+      return
+    }
+    if (value.size === 0 || value.size > MAX_AUDIO_UPLOAD_BYTES) {
+      error.value = 'Choose a non-empty WAV file up to 100 MB.'
+      return
+    }
     reset()
-    if (!value.name.toLowerCase().endsWith('.wav')) error.value = 'Choose a WAV file.'
-    else if (value.size === 0 || value.size > MAX_AUDIO_UPLOAD_BYTES) error.value = 'Choose a non-empty WAV file up to 100 MB.'
-    else file.value = value
+    file.value = value
   }
 
   async function poll(id: string): Promise<void> {
@@ -40,8 +47,10 @@ export function useAudioScoreWorkspace() {
       error.value = next.error ?? ''
       reconnecting.value = false
       if (next.status === 'running' || next.status === 'uploading') timer = setTimeout(() => void poll(id), 1000)
+      else cancelling.value = false
     } catch (cause) {
       if (disposed || signal.aborted) return
+      cancelling.value = false
       error.value = requestError(cause, 'Connection lost. Please reconnect.')
       if ((cause as { statusCode?: number })?.statusCode === 404) {
         job.value = null
@@ -71,11 +80,21 @@ export function useAudioScoreWorkspace() {
   }
 
   async function cancel(): Promise<void> {
-    if (!job.value) return
+    if (!job.value || cancelling.value) return
+    cancelling.value = true
+    clearTimeout(timer)
+    request?.abort()
+    const id = job.value.id
     try {
-      await $fetch(`/api/audio-scores/${job.value.id}`, { method: 'DELETE' })
-      await poll(job.value.id)
-    } catch (cause) { error.value = requestError(cause, 'Could not cancel. Please retry.') }
+      await $fetch(`/api/audio-scores/${id}`, { method: 'DELETE' })
+      if (!disposed) await poll(id)
+    } catch (cause) {
+      cancelling.value = false
+      if (!disposed) {
+        error.value = requestError(cause, 'Could not cancel. Please retry.')
+        reconnecting.value = true
+      }
+    }
   }
 
   function reset(): void {
@@ -105,7 +124,7 @@ export function useAudioScoreWorkspace() {
     request?.abort()
   })
 
-  return { file, job, error, busy, uploading, reconnecting, selectFile, start, cancel, reset,
+  return { file, job, error, busy, uploading, reconnecting, cancelling, selectFile, start, cancel, reset,
     reconnect: () => job.value && poll(job.value.id) }
 }
 

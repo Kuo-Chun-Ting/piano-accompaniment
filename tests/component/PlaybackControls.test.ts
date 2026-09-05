@@ -3,6 +3,25 @@ import { expect, test } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import PlaybackControls from '../../components/PlaybackControls.vue'
 
+test('test_PlaybackControls_when_dragging_then_keeps_user_position_until_commit', async () => {
+  // Arrange
+  const wrapper = await mountSuspended(PlaybackControls, { props: {
+    status: 'playing', progress: 0.1, elapsedSeconds: 10, durationSeconds: 100,
+  } })
+  const slider = wrapper.get('input')
+  // Act
+  await slider.trigger('pointerdown')
+  slider.element.value = '0.8'
+  await slider.trigger('input')
+  await wrapper.setProps({ progress: 0.12, elapsedSeconds: 12 })
+  // Assert
+  expect(slider.element.value).toBe('0.8')
+  expect(wrapper.get('time').text()).toBe('01:20 / 01:40')
+  await slider.trigger('change')
+  expect(wrapper.emitted('seek')?.at(-1)).toEqual([0.8])
+  wrapper.unmount()
+})
+
 test('test_PlaybackControls_when_playing_then_exposes_pause_and_formatted_time', async () => {
   // Arrange
   const wrapper = await mountSuspended(PlaybackControls, { props: {
