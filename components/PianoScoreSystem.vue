@@ -27,11 +27,13 @@ import {
 } from '~/shared/ui/scoreLayout'
 import type { ScoreSystem } from '~/shared/ui/scoreSystems'
 import { fitTextWithinBounds, getScoreSystemMeasureWidths } from '~/shared/ui/scoreSystems'
+import { wrapScoreText } from '~/shared/ui/scorePdfLayout'
 
 const props = defineProps<{
   system: ScoreSystem
   keySignature?: ScoreKeySignature
   pedalIntervals?: ScorePedalInterval[]
+  wrapLyrics?: boolean
 }>()
 
 const container = ref<HTMLDivElement | null>(null)
@@ -174,9 +176,19 @@ function drawLyrics(
   const noteEndX = staveX + staveWidth - 12
   context.openGroup('score-lyrics')
   context.setFont('Iowan Old Style, "Noto Serif TC", serif', 13, 400)
+  let nextLyricY = baselineY
   lyrics.forEach((lyric) => {
     const preferredX = getScoreCueX(lyric.startBeat, noteStartX, noteEndX)
     const textWidth = context.measureText(lyric.text).width
+    if (props.wrapLyrics) {
+      const x = fitTextWithinBounds(preferredX, textWidth, staveX + 12, noteEndX)
+      const lines = wrapScoreText(lyric.text, noteEndX - x, text => context.measureText(text).width)
+      lines.forEach((line, index) => {
+        context.fillText(line, x, nextLyricY + index * 18)
+      })
+      if (lines.length > 1) nextLyricY += lines.length * 18
+      return
+    }
     context.fillText(
       lyric.text,
       fitTextWithinBounds(preferredX, textWidth, staveX + 12, noteEndX),

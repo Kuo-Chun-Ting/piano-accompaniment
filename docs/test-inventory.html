@@ -1393,12 +1393,12 @@
         <td class="io">預期 X 座標 clamp 在 note bounds。</td>
       </tr>
       <tr>
-        <td class="file" rowspan="1"><code>tests/unit/ui/scorePdf.test.ts</code></td>
-        <td class="scope" rowspan="1">輸入 score title 與瀏覽器 print API stub；預期輸出列印行為與 title restore。</td>
-        <td class="count" rowspan="1">1</td>
-        <td class="function"><code>test_exportScoreAsPdf_when_called_then_prints_with_score_title_and_restores_page_title</code></td>
-        <td class="io">輸入 score title</td>
-        <td class="io">預期呼叫 print 並還原 page title。</td>
+        <td class="file"><code>tests/unit/ui/scorePdfLayout.test.ts</code></td>
+        <td class="scope">A4 整排分頁與中英文換行。</td>
+        <td class="count">4</td>
+        <td class="function"><code>test_paginateScoreSystems_when_page_full_then_moves_whole_system_to_next_page</code><br><code>test_paginateScoreSystems_when_system_exceeds_page_then_rejects_instead_of_clipping</code><br><code>test_paginateScoreSystems_when_system_fits_exactly_then_does_not_add_blank_page</code><br><code>test_wrapScoreText_when_lyrics_exceed_width_then_preserves_words_and_wraps_chinese</code></td>
+        <td class="io">排高、可印高度、標題高度、間隔與長文字。</td>
+        <td class="io">整排換頁、不裁切、不多出空白頁；文字完整換行。</td>
       </tr>
       <tr>
         <td class="file" rowspan="16"><code>tests/unit/ui/scoreSystems.test.ts</code></td>
@@ -1816,6 +1816,24 @@
         <td class="scope">標頭與上傳區共用產品 icon，避免圖形來源分歧。</td><td class="count">1</td>
         <td class="function"><code>test_ProductIcon_when_toolbar_and_upload_render_then_share_icon_source</code></td>
         <td class="io">標頭、音訊上傳區。</td><td class="io">兩處使用同一 ProductIcon 元件，SVG 比例相同，裝飾圖示不重複朗讀。</td>
+      </tr>
+      <tr>
+        <td class="type">Unit</td><td class="file"><code>tests/unit/ui/scoreSystems.test.ts</code>（新增）</td>
+        <td class="scope">PDF 三單位排寬。</td><td class="count">1</td>
+        <td class="function"><code>test_buildScoreSystems_when_print_capacity_is_three_then_final_full_row_uses_full_width</code></td>
+        <td class="io">六小節、每排三單位。</td><td class="io">兩排都填滿；螢幕預設仍為四單位。</td>
+      </tr>
+      <tr>
+        <td class="type">Component</td><td class="file"><code>tests/component/PianoScoreSystem.test.ts</code>（新增）</td>
+        <td class="scope">匯出歌詞拍點。</td><td class="count">1</td>
+        <td class="function"><code>test_PianoScoreSystem_when_export_has_short_lyric_cues_then_preserves_beat_positions</code></td>
+        <td class="io">第一拍與第三拍的短歌詞。</td><td class="io">PDF 與螢幕的歌詞座標相同。</td>
+      </tr>
+      <tr>
+        <td class="type">E2E</td><td class="file"><code>tests/e2e/score-pdf.spec.ts</code></td>
+        <td class="scope">瀏覽器直接下載 PDF。</td><td class="count">1</td>
+        <td class="function"><code>test_scorePdf_when_downloaded_then_exports_all_measures_without_changing_screen_layout</code></td>
+        <td class="io">中文曲名、多排樂譜與長歌詞；stub 已完成工作。</td><td class="io">下載有效 PDF、完整排數與嵌入字型，螢幕尺寸不變，移除匯出暫存元件。</td>
       </tr>
     </tbody>
   </table>

@@ -7,7 +7,6 @@ import {
   resolveInitialPlaybackBpm,
 } from '~/shared/audio/playbackTempo'
 import type { ConfirmedChart } from '~/shared/schemas/chart'
-import { exportScoreAsPdf } from '~/shared/ui/scorePdf'
 
 const props = withDefaults(defineProps<{
   active: boolean
@@ -34,6 +33,8 @@ const {
   stopPlayback,
 } = usePianoPlayback(toRef(props, 'referenceAudio'))
 const playbackBpm = ref(DEFAULT_PLAYBACK_BPM)
+const exportingPdf = ref(false)
+const pdfError = ref('')
 
 const currentVersion = computed(() =>
   props.arrangements?.versions.find(version => version.level === selectedLevel.value) || null,
@@ -122,12 +123,22 @@ async function handlePlaybackMode(mode: 'score' | 'reference'): Promise<void> {
   }
 }
 
-function handleExportPdf(): void {
-  exportScoreAsPdf({
-    document: window.document,
-    window,
-    scoreTitle: props.chart?.title || 'Piano accompaniment',
-  })
+async function handleExportPdf(): Promise<void> {
+  if (exportingPdf.value || !currentVersion.value) return
+  const version = currentVersion.value
+  const scoreTitle = props.chart?.title || 'Piano accompaniment'
+  const tempo = playbackBpm.value
+  exportingPdf.value = true
+  pdfError.value = ''
+  try {
+    const { exportScoreAsPdf } = await import('~/shared/ui/scorePdf')
+    await exportScoreAsPdf({ version, scoreTitle, tempo })
+  } catch (error) {
+    console.error('PDF export failed', error)
+    pdfError.value = 'PDF export failed. Please try again.'
+  } finally {
+    exportingPdf.value = false
+  }
 }
 </script>
 
@@ -151,14 +162,18 @@ function handleExportPdf(): void {
           <button
             class="download-button"
             type="button"
-            data-tooltip="Export PDF"
-            aria-label="Export score as PDF"
+            :data-tooltip="exportingPdf ? 'Creating PDF…' : 'Download PDF'"
+            :aria-label="exportingPdf ? 'Creating PDF' : 'Export score as PDF'"
+            :disabled="exportingPdf"
+            :aria-busy="exportingPdf"
             @click="handleExportPdf"
           >
             ↓
           </button>
         </div>
       </header>
+
+      <p v-if="pdfError" role="alert" class="playback-error">{{ pdfError }}</p>
 
       <header class="score-controls">
         <div class="player-controls">

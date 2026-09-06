@@ -6,6 +6,7 @@ export type ScoreSystem = {
   measures: ScoreMeasure[]
   measureLayoutUnits: number[]
   isFinalSystem: boolean
+  layoutUnitsPerSystem?: number
 }
 
 export type ScoreSeekTarget = {
@@ -15,7 +16,7 @@ export type ScoreSeekTarget = {
 
 const SCORE_LAYOUT_UNITS_PER_SYSTEM = 4
 
-export function buildScoreSystems(measures: ScoreMeasure[]): ScoreSystem[] {
+export function buildScoreSystems(measures: ScoreMeasure[], layoutUnitsPerSystem = SCORE_LAYOUT_UNITS_PER_SYSTEM): ScoreSystem[] {
   const systems: ScoreSystem[] = []
   let currentMeasures: ScoreMeasure[] = []
   let currentUnits: number[] = []
@@ -23,7 +24,7 @@ export function buildScoreSystems(measures: ScoreMeasure[]): ScoreSystem[] {
   measures.forEach((measure, measureIndex) => {
     const measureUnits = getMeasureLayoutUnits(measure)
     if (currentMeasures.length > 0
-      && sum(currentUnits) + measureUnits > SCORE_LAYOUT_UNITS_PER_SYSTEM) {
+      && sum(currentUnits) + measureUnits > layoutUnitsPerSystem) {
       systems.push(buildSystem(measureIndex - currentMeasures.length, currentMeasures, currentUnits))
       currentMeasures = []
       currentUnits = []
@@ -35,7 +36,7 @@ export function buildScoreSystems(measures: ScoreMeasure[]): ScoreSystem[] {
   if (currentMeasures.length > 0) {
     systems.push(buildSystem(measures.length - currentMeasures.length, currentMeasures, currentUnits))
   }
-  return markFinalSystem(systems)
+  return markFinalSystem(systems).map(system => ({ ...system, layoutUnitsPerSystem }))
 }
 
 export function groupScoreMeasures(
@@ -165,6 +166,6 @@ export function getScoreSystemSeekTarget(
 
 function getSystemLayoutUnits(system: ScoreSystem): number {
   return system.isFinalSystem
-    ? SCORE_LAYOUT_UNITS_PER_SYSTEM
+    ? system.layoutUnitsPerSystem ?? SCORE_LAYOUT_UNITS_PER_SYSTEM
     : sum(system.measureLayoutUnits)
 }

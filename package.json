@@ -17,6 +17,9 @@
     "audio:score:verify": "tsx scripts/audio-score-verify.ts && vitest run tests/component/AudioScoreGeneratedOutput.test.ts tests/component/PianoScoreSystem.test.ts"
   },
   "dependencies": {
+    "@vexflow-fonts/academico": "^1.0.1",
+    "@vexflow-fonts/bravura": "^1.0.2",
+    "jspdf": "^4.2.1",
     "nuxt": "^3.21.8",
     "openai": "^6.48.0",
     "vexflow": "^5.0.0",

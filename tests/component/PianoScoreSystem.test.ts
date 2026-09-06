@@ -25,6 +25,22 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals())
 
+test('test_PianoScoreSystem_when_export_has_short_lyric_cues_then_preserves_beat_positions', async () => {
+  // Arrange
+  const system = buildSystem([buildEvent(1, 4, ['C4'])])
+  system.measures[0]!.lyrics = [{ startBeat: 1, text: 'one' }, { startBeat: 3, text: 'two' }]
+  const screen = mount(PianoScoreSystem, { props: { system } })
+  // Act
+  const printed = mount(PianoScoreSystem, { props: { system, wrapLyrics: true } })
+  await nextTick()
+  // Assert
+  const positions = (wrapper: typeof screen) => wrapper.findAll('.vf-score-lyrics text').map(text => [text.attributes('x'), text.attributes('y')])
+  expect(positions(printed)).toEqual(positions(screen))
+  expect(positions(printed)).toHaveLength(2)
+  screen.unmount()
+  printed.unmount()
+})
+
 test('test_PianoScoreSystem_when_eighth_notes_are_beamed_then_does_not_render_flags_on_beamed_notes', async () => {
   // Arrange
   const eighthNotes = Array.from({ length: 8 }, (_, index) =>

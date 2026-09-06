@@ -48,6 +48,17 @@ function buildPlaybackPosition(
   }
 }
 
+test('test_buildScoreSystems_when_print_capacity_is_three_then_final_full_row_uses_full_width', () => {
+  // Arrange
+  const measures = Array.from({ length: 6 }, (_, index) => buildMeasure(index))
+  // Act
+  const systems = buildScoreSystems(measures, 3)
+  // Assert
+  expect(systems.map(system => getScoreSystemMeasureWidths(system, 900))).toEqual([
+    [300, 300, 300], [300, 300, 300],
+  ])
+})
+
 test('test_groupScoreMeasures_when_measure_count_exceeds_system_size_then_groups_continuously', () => {
   // Arrange
   const measures = Array.from({ length: 10 }, (_, index) => buildMeasure(index))
