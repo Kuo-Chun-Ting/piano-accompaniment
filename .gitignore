@@ -21,7 +21,5 @@ chord-charts/*
 /docs/superpowers/
 /.superpowers/
 demo/
-安靜.wav
-楓.wav
-安靜-piano-reference.wav
-楓-piano-reference.wav
+/audio/
+/pdf/

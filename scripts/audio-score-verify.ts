@@ -33,8 +33,8 @@ type ScoreFile = {
 const projectDirectory = resolve(import.meta.dirname, '..')
 const execFileAsync = promisify(execFile)
 const verificationCases: VerificationCase[] = [
-  { name: '安靜', referenceAudio: '安靜-piano-reference.wav' },
-  { name: '楓', referenceAudio: '楓-piano-reference.wav' },
+  { name: '安靜', referenceAudio: 'tests/fixtures/audio/安靜-piano-reference.wav' },
+  { name: '楓', referenceAudio: 'tests/fixtures/audio/楓-piano-reference.wav' },
 ]
 
 export async function runAudioScoreVerification(): Promise<void> {
