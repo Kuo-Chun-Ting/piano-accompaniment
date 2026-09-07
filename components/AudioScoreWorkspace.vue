@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ProductIcon from './ProductIcon.vue'
-import { AUDIO_SCORE_PHASES, audioScorePhase, audioScoreStageLabel } from '../shared/audio-transcription/job'
+import { AUDIO_SCORE_PHASES, audioScorePhase, audioScoreStageLabel } from '~/shared/audio-transcription/job'
 const emit = defineEmits<{ busy: [value: boolean]; result: [value: boolean] }>()
 const { file, job, error, busy, uploading, reconnecting, cancelling, selectFile, start, cancel, reset, reconnect } = useAudioScoreWorkspace()
 const dragging = ref(false)
