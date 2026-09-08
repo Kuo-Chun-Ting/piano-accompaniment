@@ -8,9 +8,7 @@ import ProductIcon from '../../components/ProductIcon.vue'
 test('test_ProductIcon_when_toolbar_and_upload_render_then_share_icon_source', async () => {
   // Arrange
   sessionStorage.clear()
-  const toolbar = await mountSuspended(StudioToolbar, {
-    props: { activeView: 'score', chartAvailable: false, scoreAvailable: false },
-  })
+  const toolbar = await mountSuspended(StudioToolbar)
   const workspace = await mountSuspended(AudioScoreWorkspace)
   try {
     // Act

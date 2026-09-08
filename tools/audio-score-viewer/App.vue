@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { ArrangementSet } from '../../shared/arrangement/types'
-import type { ConfirmedChart } from '../../shared/schemas/chart'
+import type { ArrangementSet, ScoreMetadata } from '../../shared/arrangement/types'
 import { parseViewerData } from './viewerData'
 
 const data = parseViewerData(__AUDIO_SCORE_DATA__)
@@ -9,15 +8,9 @@ const arrangements: ArrangementSet = {
   versions: [data.version],
   blockingIssues: [],
 }
-const chart: ConfirmedChart = {
+const chart: ScoreMetadata = {
   title: data.title,
-  originalKey: 'C',
-  mode: 'major',
-  normalizedKey: 'C',
-  meter: '4/4',
   tempo: data.tempo,
-  mood: 'spacious-ballad',
-  sections: [],
 }
 </script>
 

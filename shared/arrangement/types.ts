@@ -1,4 +1,9 @@
-import type { Mood } from '../schemas/chart'
+export type Mood = 'spacious-ballad' | 'flowing-narrative' | 'urban-groove'
+
+export type ScoreMetadata = {
+  title: string | null
+  tempo: number | null
+}
 
 export type ArrangementLevelName = 'easy' | 'rich'
 export type MeasureIntensity = 'soft' | 'medium' | 'strong'

@@ -4,7 +4,7 @@ Turn a WAV recording into a piano accompaniment score. Preview the audio, play t
 
 ## Quick Start (Docker)
 
-Install and start Docker with Docker Compose. You also need [downloaded model files](docs/development.md#models); model setup is not automated. No OpenAI API key is needed.
+Install and start Docker with Docker Compose. You also need [downloaded model files](docs/development.md#models); model setup is not automated.
 
 1. Put the models in `.audio-score-models/` at the project root.
 2. Run:

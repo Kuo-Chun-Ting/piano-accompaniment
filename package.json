@@ -10,7 +10,6 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:live": "PLAYWRIGHT_LIVE=true playwright test --grep @live",
     "typecheck": "nuxt typecheck",
     "audio:score:viewer": "vite build --config tools/audio-score-viewer/vite.config.ts",
     "audio:score": "tsx scripts/audio-score.ts",
@@ -22,7 +21,6 @@
     "@vexflow-fonts/bravura": "^1.0.2",
     "jspdf": "^4.2.1",
     "nuxt": "^3.21.8",
-    "openai": "^6.48.0",
     "vexflow": "^5.0.0",
     "zod": "^4.4.3"
   },

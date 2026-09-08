@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import type { ArrangementLevelName, ArrangementSet } from '~/shared/arrangement/types'
+import type { ArrangementLevelName, ArrangementSet, ScoreMetadata } from '~/shared/arrangement/types'
 import type { ReferenceAudio } from '~/shared/audio/referenceAudio'
 import { getMeasureSeekSeconds } from '~/shared/audio/playbackSchedule'
 import {
   DEFAULT_PLAYBACK_BPM,
   resolveInitialPlaybackBpm,
 } from '~/shared/audio/playbackTempo'
-import type { ConfirmedChart } from '~/shared/schemas/chart'
 
 const props = withDefaults(defineProps<{
   active: boolean
   arrangements: ArrangementSet | null
-  chart: ConfirmedChart | null
+  chart: ScoreMetadata | null
   showVersionSwitcher?: boolean
   referenceAudio?: ReferenceAudio
 }>(), {

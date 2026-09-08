@@ -3,8 +3,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import { ref } from 'vue'
 import ArrangementGrid from '../../components/ArrangementGrid.vue'
-import type { ArrangementSet, ScoreMeasure } from '../../shared/arrangement/types'
-import type { ConfirmedChart } from '../../shared/schemas/chart'
+import type { ArrangementSet, ScoreMeasure, ScoreMetadata } from '../../shared/arrangement/types'
 
 const mockUsePianoPlayback = vi.hoisted(() => vi.fn())
 
@@ -74,7 +73,7 @@ test('test_ArrangementGrid_when_version_switcher_is_hidden_then_keeps_playback_c
     props: {
       active: true,
       arrangements: buildArrangementSet(),
-      chart: buildConfirmedChart(),
+      chart: buildScoreMetadata(),
       showVersionSwitcher: false,
     },
     global: {
@@ -105,7 +104,7 @@ test('test_ArrangementGrid_when_reference_audio_is_available_then_selects_source
     props: {
       active: true,
       arrangements: buildArrangementSet(),
-      chart: buildConfirmedChart(),
+      chart: buildScoreMetadata(),
       referenceAudio: {
         src: 'piano.wav',
         scoreStartSeconds: 8.79,
@@ -163,7 +162,7 @@ test('test_ArrangementGrid_when_arrangement_has_blocking_issue_then_hides_score_
     props: {
       active: true,
       arrangements,
-      chart: buildConfirmedChart(),
+      chart: buildScoreMetadata(),
     },
   })
 
@@ -177,7 +176,7 @@ async function mountArrangementGrid() {
     props: {
       active: true,
       arrangements: buildArrangementSet(),
-      chart: buildConfirmedChart(),
+      chart: buildScoreMetadata(),
     },
     global: {
       stubs: {
@@ -223,32 +222,6 @@ function buildScoreMeasure(index: number): ScoreMeasure {
   }
 }
 
-function buildConfirmedChart(): ConfirmedChart {
-  return {
-    title: 'Fixture Song',
-    originalKey: 'C',
-    mode: 'major',
-    normalizedKey: 'C',
-    meter: '4/4',
-    tempo: 72,
-    mood: 'spacious-ballad',
-    sections: [{
-      id: 'verse',
-      label: 'Verse',
-      order: 1,
-      measures: [{
-        index: 1,
-        lyric: 'one',
-        chords: [{
-          chord: 'C',
-          durationBeats: 4,
-          lyric: 'one',
-          sourceChordConfidence: 'visible',
-          sourceDurationConfidence: 'visible',
-          sourceLyricConfidence: 'visible',
-          wasEdited: false,
-        }],
-      }],
-    }],
-  }
+function buildScoreMetadata(): ScoreMetadata {
+  return { title: 'Fixture Song', tempo: 72 }
 }
