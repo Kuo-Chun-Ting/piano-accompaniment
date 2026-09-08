@@ -71,6 +71,23 @@ export function resolveAudioScorePaths(outputDirectory: string): AudioScorePaths
   }
 }
 
+export function buildViewerCommand(
+  paths: AudioScorePaths,
+  enabled: boolean,
+): PipelineCommand | null {
+  if (!enabled) return null
+
+  return {
+    stage: 'build-viewer',
+    executable: 'npm',
+    args: ['run', 'audio:score:viewer'],
+    environment: {
+      AUDIO_SCORE_DATA: paths.score,
+      AUDIO_SCORE_VIEWER_OUT: paths.outputDirectory,
+    },
+  }
+}
+
 export function buildAudioScorePipeline(config: AudioScorePipelineConfig): PipelineCommand[] {
   const paths = resolveAudioScorePaths(config.outputDirectory)
   const pythonBinDirectory = dirname(config.pythonExecutable)

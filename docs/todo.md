@@ -39,6 +39,8 @@ Items are ordered by recommended implementation priority.
 
 ## Later
 
+- [ ] Allow multiple users to submit transcription jobs. Requests are currently rejected while one job is running; decide queue behavior and concurrency based on available resources.
+- [ ] Reuse completed results when the same audio is uploaded again. Compare file content and transcription settings/model versions; currently every upload runs the full pipeline again.
 - [ ] Let users enter a song title and artist instead of preparing an audio file themselves.
 - [ ] Evaluate additional score types only after the piano-score workflow is validated.
 - [ ] Consider advanced notation editing only when the target users demonstrate a need for it.

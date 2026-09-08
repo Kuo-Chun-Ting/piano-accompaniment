@@ -8,6 +8,7 @@ export type AudioScoreCliOptions = {
   modelsDirectory: string
   separationDevice: 'cpu' | 'mps'
   title: string
+  buildViewer: boolean
 }
 
 type ParseAudioScoreContext = {
@@ -22,7 +23,8 @@ export function parseAudioScoreArgs(
   args: string[],
   context: ParseAudioScoreContext = {
     cwd: process.cwd(),
-    runtimeDirectory: getDefaultRuntimeDirectory(process.platform),
+    runtimeDirectory: process.env.AUDIO_SCORE_RUNTIME_DIR
+      || getDefaultRuntimeDirectory(process.platform),
     platform: process.platform,
   },
 ): AudioScoreCliOptions {
@@ -34,7 +36,8 @@ export function parseAudioScoreArgs(
   if (extname(input).toLowerCase() !== '.wav') {
     throw new Error(`Input must be a WAV file: ${input}`)
   }
-  if (args.length !== 1) {
+  const flags = args.slice(1)
+  if (flags.some(flag => flag !== '--skip-viewer') || flags.length > 1) {
     throw new Error('Only one WAV recording path is accepted')
   }
 
@@ -60,6 +63,7 @@ export function parseAudioScoreArgs(
     modelsDirectory: join(context.runtimeDirectory, 'models'),
     separationDevice: context.platform === 'darwin' ? 'mps' : 'cpu',
     title: defaultTitle,
+    buildViewer: !flags.includes('--skip-viewer'),
   }
 }
 

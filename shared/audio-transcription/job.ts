@@ -27,6 +27,7 @@ const STAGE_PHASES: Record<string, number> = {
   'export-midi-notes': 2,
   'export-pitch-energy': 2,
   'transcribe-lyrics': 3,
+  'build-score': 4,
   'build-viewer': 4,
 }
 

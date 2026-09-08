@@ -101,7 +101,7 @@ test('test_audio_studio_when_phases_advance_then_updates_segments_without_moving
     ['separate-piano', 'Separating piano', 1],
     ['transcribe-midi', 'Recognizing notes', 2],
     ['transcribe-lyrics', 'Recognizing lyrics', 3],
-    ['build-viewer', 'Creating score', 4],
+    ['build-score', 'Creating score', 4],
   ] as const) {
     stage = nextStage
     await expect(page.getByRole('status')).toContainText(label)
@@ -137,7 +137,7 @@ test('test_audio_studio_when_uploaded_then_renders_restores_and_seeks_native_ref
   })
   await page.route('**/api/audio-scores/fixture', route => route.fulfill({ json: ++polls < 2
     ? { id: 'fixture', title: '楓', status: 'running', stage: 'separate-piano' }
-    : { id: 'fixture', title: '楓', status: 'succeeded', stage: 'build-viewer', result } }))
+    : { id: 'fixture', title: '楓', status: 'succeeded', stage: 'build-score', result } }))
   await page.route('**/fixture-piano.wav', route => {
     const range = /^bytes=(\d+)-(\d*)$/.exec(route.request().headers().range ?? '')
     const start = range ? Number(range[1]) : 0

@@ -3,13 +3,27 @@ import { createWriteStream } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { AudioScoreWorker } from './audioScoreJobs'
 
+export function buildAudioScoreWorkerCommand(
+  projectDirectory: string,
+  inputPath: string,
+  production = process.env.NODE_ENV === 'production',
+): { cwd: string, args: string[] } {
+  return {
+    cwd: projectDirectory,
+    args: production
+      ? [join(projectDirectory, '.output/audio-score.mjs'), inputPath, '--skip-viewer']
+      : ['--import', 'tsx', 'scripts/audio-score.ts', inputPath, '--skip-viewer'],
+  }
+}
+
 /** Runs the same CLI used locally. Each job owns its process group and log. */
 export function createAudioScoreWorker(projectDirectory: string): AudioScoreWorker {
   return ({ inputPath, signal, onStage }) => new Promise<void>((resolve, reject) => {
     if (signal.aborted) { reject(new Error('Cancelled')); return }
     const log = createWriteStream(join(dirname(inputPath), 'pipeline.log'))
-    const child = spawn(process.execPath, ['--import', 'tsx', 'scripts/audio-score.ts', inputPath], {
-      cwd: projectDirectory, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'],
+    const command = buildAudioScoreWorkerCommand(projectDirectory, inputPath)
+    const child = spawn(process.execPath, command.args, {
+      cwd: command.cwd, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'],
     })
     let pending = ''
     child.stdout.on('data', (chunk: Buffer) => {

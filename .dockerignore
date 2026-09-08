@@ -1,0 +1,23 @@
+# Only application sources enter the build context; recordings, credentials,
+# generated files, Git history, and local dependencies stay on the host.
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!app.vue
+!nuxt.config.ts
+!tsconfig.json
+!components/
+!components/**
+!composables/
+!composables/**
+!pages/
+!pages/**
+!server/
+!server/**
+!shared/
+!shared/**
+!tools/
+!tools/**
+!scripts/
+!scripts/**

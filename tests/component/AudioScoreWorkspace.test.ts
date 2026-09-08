@@ -178,6 +178,7 @@ test.each([
   ['export-midi-notes', 2, 'Recognizing notes'],
   ['export-pitch-energy', 2, 'Recognizing notes'],
   ['transcribe-lyrics', 3, 'Recognizing lyrics'],
+  ['build-score', 4, 'Creating score'],
   ['build-viewer', 4, 'Creating score'],
 ])('test_AudioScoreWorkspace_when_stage_is_%s_then_shows_current_phase', async (stage, phase, label) => {
   // Arrange

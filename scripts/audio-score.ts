@@ -1,7 +1,8 @@
+import { realpathSync } from 'node:fs'
 import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { execFileSync, spawn } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { performance } from 'node:perf_hooks'
 import { parseAudioScoreArgs } from '../shared/audio-transcription/cli'
 import { convertTranscriptionToScore } from '../shared/audio-transcription/midiToScore'
@@ -15,6 +16,7 @@ import {
 } from '../shared/audio-transcription/sustainInference'
 import {
   buildAudioScorePipeline,
+  buildViewerCommand,
   resolveAudioScorePaths,
   type PipelineCommand,
 } from '../shared/audio-transcription/pipeline'
@@ -102,6 +104,7 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
     stages.push(await runCommand(command))
   }
 
+  console.log('\n→ build-score')
   await copyFile(paths.pianoStem, paths.pianoAudio)
   const notesFile = parseMidiNotes(await readJson(paths.notes))
   const pitchEnergy = parsePitchEnergyFile(await readJson(paths.pitchEnergy))
@@ -155,16 +158,11 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
   }
 
   await writeJson(paths.score, scoreData)
-  stages.push(await runCommand({
-    stage: 'build-viewer',
-    executable: 'npm',
-    args: ['run', 'audio:score:viewer'],
-    environment: {
-      AUDIO_SCORE_DATA: paths.score,
-      AUDIO_SCORE_VIEWER_OUT: paths.outputDirectory,
-    },
-  }, projectDirectory))
-  await assertFile(paths.viewer, 'Interactive score viewer')
+  const viewerCommand = buildViewerCommand(paths, options.buildViewer)
+  if (viewerCommand) {
+    stages.push(await runCommand(viewerCommand, projectDirectory))
+    await assertFile(paths.viewer, 'Interactive score viewer')
+  }
   await writeJson(paths.report, {
     input: options.inputPath,
     outputDirectory: options.outputDirectory,
@@ -193,7 +191,7 @@ export async function runAudioScoreCli(args = process.argv.slice(2)): Promise<vo
 
   console.log(JSON.stringify({
     ok: true,
-    viewer: paths.viewer,
+    viewer: options.buildViewer ? paths.viewer : undefined,
     score: paths.score,
     pianoAudio: paths.pianoAudio,
     midi: paths.midi,
@@ -314,7 +312,7 @@ function roundSeconds(value: number): number {
 }
 
 if (process.argv[1]
-  && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolve(process.argv[1]))) {
   runAudioScoreCli().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : error)
     process.exitCode = 1

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   buildAudioScorePipeline,
+  buildViewerCommand,
   resolveAudioScorePaths,
 } from '../../../shared/audio-transcription/pipeline'
 
@@ -121,5 +122,35 @@ describe('audioScorePipeline', () => {
         '/tmp/model weights/whisper',
       ],
     })
+  })
+
+  test('test_buildViewerCommand_when_viewer_is_enabled_then_returns_vite_command', () => {
+    // Arrange
+    const paths = resolveAudioScorePaths('/tmp/My Score Output')
+
+    // Act
+    const command = buildViewerCommand(paths, true)
+
+    // Assert
+    expect(command).toEqual({
+      stage: 'build-viewer',
+      executable: 'npm',
+      args: ['run', 'audio:score:viewer'],
+      environment: {
+        AUDIO_SCORE_DATA: '/tmp/My Score Output/score.json',
+        AUDIO_SCORE_VIEWER_OUT: '/tmp/My Score Output',
+      },
+    })
+  })
+
+  test('test_buildViewerCommand_when_viewer_is_disabled_then_returns_null', () => {
+    // Arrange
+    const paths = resolveAudioScorePaths('/tmp/My Score Output')
+
+    // Act
+    const command = buildViewerCommand(paths, false)
+
+    // Assert
+    expect(command).toBeNull()
   })
 })

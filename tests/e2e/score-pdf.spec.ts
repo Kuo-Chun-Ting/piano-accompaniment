@@ -19,7 +19,7 @@ test('test_scorePdf_when_downloaded_then_exports_all_measures_without_changing_s
     }
   })
   await page.route('**/api/audio-scores/pdf', route => route.fulfill({ json: {
-    id: 'pdf', title: result.title, status: 'succeeded', stage: 'build-viewer', result,
+    id: 'pdf', title: result.title, status: 'succeeded', stage: 'build-score', result,
   } }))
   await page.goto('/')
   await expect(page.locator('.score-system[data-layout-ready=true]')).toHaveCount(3)

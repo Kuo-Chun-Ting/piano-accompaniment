@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "nuxt dev",
-    "build": "nuxt build",
+    "build": "nuxt build && npm run build:audio-score",
+    "build:audio-score": "vite build --config tools/audio-score-bundle/vite.config.ts",
     "preview": "nuxt preview",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",

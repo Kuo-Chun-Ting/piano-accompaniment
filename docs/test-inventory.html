@@ -458,9 +458,9 @@
       <tr><td class="function"><code>test_startAudioScoreServer_when_head_requested_then_returns_headers_without_body</code></td><td class="io">HEAD</td><td class="io">正確 Content-Length，沒有 body。</td></tr>
       <tr><td class="function"><code>test_startAudioScoreServer_when_empty_file_then_returns_empty_body_without_crashing</code></td><td class="io">空檔案</td><td class="io">200，沒有未處理錯誤或卡住的連線。</td></tr>
       <tr>
-        <td class="file" rowspan="2"><code>tests/unit/audio-transcription/pipeline.test.ts</code></td>
-        <td class="scope" rowspan="2">輸入音訊、輸出、Python、模型與專案路徑；預期輸出固定產物配置，以及鋼琴、逐音高能量與歌詞命令。</td>
-        <td class="count" rowspan="2">2</td>
+        <td class="file" rowspan="4"><code>tests/unit/audio-transcription/pipeline.test.ts</code></td>
+        <td class="scope" rowspan="4">輸入音訊、輸出、Python、模型與專案路徑；預期輸出固定產物配置，以及鋼琴、逐音高能量、歌詞與選用的獨立預覽頁命令。</td>
+        <td class="count" rowspan="4">4</td>
         <td class="function"><code>test_resolveAudioScorePaths_when_output_has_spaces_then_returns_deterministic_layout</code></td>
         <td class="io">輸入含空白的輸出目錄</td>
         <td class="io">預期回傳固定且完整的產物路徑。</td>
@@ -469,6 +469,16 @@
         <td class="function"><code>test_buildAudioScorePipeline_when_paths_have_spaces_then_preserves_argument_boundaries</code></td>
         <td class="io">輸入含空白的 WAV、Python、模型與專案路徑</td>
         <td class="io">預期七階段命令保留獨立參數，並把 Whisper、CA、Hugging Face 與 Torch 快取固定在內部 runtime。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildViewerCommand_when_viewer_is_enabled_then_returns_vite_command</code></td>
+        <td class="io">啟用獨立預覽頁</td>
+        <td class="io">預期建立 Vite viewer 命令並傳入 score 與輸出路徑。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_buildViewerCommand_when_viewer_is_disabled_then_returns_null</code></td>
+        <td class="io">網站工作不需要獨立預覽頁</td>
+        <td class="io">預期不建立 viewer 命令。</td>
       </tr>
       <tr>
         <td class="file" rowspan="5"><code>tests/unit/audio-transcription/sustainInference.test.ts</code></td>
@@ -607,9 +617,9 @@
         <td class="io">預期載入完成後才設定原曲秒數並開始播放。</td>
       </tr>
       <tr>
-        <td class="file" rowspan="6"><code>tests/unit/audio-transcription/cli.test.ts</code></td>
-        <td class="scope" rowspan="6">唯一輸入 WAV 路徑；預期所有生成產物都放在隱藏工作目錄，自動推導固定 runtime 與標題，並拒絕其他參數或危險檔名。</td>
-        <td class="count" rowspan="6">6</td>
+        <td class="file" rowspan="8"><code>tests/unit/audio-transcription/cli.test.ts</code></td>
+        <td class="scope" rowspan="8">輸入 WAV 路徑與選用的 viewer 旗標；預期所有生成產物都放在隱藏工作目錄，自動推導 runtime 與標題，並拒絕其他參數或危險檔名。</td>
+        <td class="count" rowspan="8">8</td>
         <td class="function"><code>test_parseAudioScoreArgs_when_input_is_missing_then_throws_usage_error</code></td>
         <td class="io">未輸入 WAV 路徑</td>
         <td class="io">預期顯示完整使用方式。</td>
@@ -623,6 +633,16 @@
         <td class="function"><code>test_parseAudioScoreArgs_when_recording_is_provided_then_derives_all_internal_paths</code></td>
         <td class="io">只輸入含空白的 WAV 相對路徑</td>
         <td class="io">預期只推導內部工作目錄、runtime 與檔名標題，不建立根目錄 HTML 副本。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseAudioScoreArgs_when_skip_viewer_is_requested_then_disables_viewer_build</code></td>
+        <td class="io">輸入 <code>--skip-viewer</code></td>
+        <td class="io">預期只產生網站需要的 score 與音訊產物。</td>
+      </tr>
+      <tr>
+        <td class="function"><code>test_parseAudioScoreArgs_when_runtime_environment_is_set_then_uses_that_directory</code></td>
+        <td class="io">設定容器 runtime 目錄</td>
+        <td class="io">預期 Python 與模型路徑使用同一個明確 runtime 根目錄。</td>
       </tr>
       <tr>
         <td class="function"><code>test_parseAudioScoreArgs_when_device_is_omitted_on_mac_then_defaults_to_mps</code></td>
@@ -1783,13 +1803,19 @@
       </tr>
       <tr>
         <td class="type">Integration</td><td class="file"><code>tests/unit/server/audioScoreWorker.test.ts</code></td>
-        <td class="scope">用測試 CLI 驗證真實子程序啟動、輸出解析與取消。</td><td class="count">3</td>
-        <td class="function"><code>test_audioScoreWorker_when_cli_succeeds_then_reports_chunked_stages_and_keeps_log</code><br><code>test_audioScoreWorker_when_cli_exits_nonzero_then_rejects</code><br><code>test_audioScoreWorker_when_cancelled_then_stops_cli_and_model_descendant</code></td>
-        <td class="io">分塊 stdout、非零退出、含子程序的執行中工作。</td><td class="io">正確階段和 log；失敗回報；取消同時停止 CLI 與模型子程序（POSIX）。</td>
+        <td class="scope">驗證開發／production worker 命令，以及真實子程序啟動、輸出解析與取消。</td><td class="count">5</td>
+        <td class="function"><code>test_buildAudioScoreWorkerCommand_when_development_then_runs_source_without_viewer</code><br><code>test_buildAudioScoreWorkerCommand_when_production_then_runs_bundled_pipeline_without_viewer</code><br><code>test_audioScoreWorker_when_cli_succeeds_then_reports_chunked_stages_and_keeps_log</code><br><code>test_audioScoreWorker_when_cli_exits_nonzero_then_rejects</code><br><code>test_audioScoreWorker_when_cancelled_then_stops_cli_and_model_descendant</code></td>
+        <td class="io">開發與 production 環境、分塊 stdout、非零退出、含子程序的執行中工作。</td><td class="io">網站不建獨立 viewer；production 執行 bundle；正確階段和 log；取消同時停止 CLI 與模型子程序（POSIX）。</td>
+      </tr>
+      <tr>
+        <td class="type">Integration</td><td class="file"><code>tests/unit/server/audioScoreProductionBuild.test.ts</code></td>
+        <td class="scope">建置並隔離執行 production 音訊轉譜 bundle，確認不依賴專案的 <code>node_modules</code>。</td><td class="count">1</td>
+        <td class="function"><code>test_audioScoreProductionBuild_when_bundled_then_runs_without_node_modules</code></td>
+        <td class="io">將建置產物複製到沒有相依套件的系統暫存目錄，再以絕對路徑執行。</td><td class="io">CLI 正常進入參數驗證並回報 usage；不發生 module-not-found，且 macOS 暫存路徑別名不會略過入口。</td>
       </tr>
       <tr>
         <td class="type">Component</td><td class="file"><code>tests/component/AudioScoreWorkspace.test.ts</code></td>
-        <td class="scope">檔名與試聽同組，選檔與提交分離；無效替換保留原檔；轉譜不鎖試聽；取消等待背景結束。五階段映射、目前階段與已完成分段；取消及斷線停止動畫。新增 <code>test_AudioScoreWorkspace_when_stage_is_%s_then_shows_current_phase</code>（8 種階段）及 <code>test_AudioScoreWorkspace_when_upload_pending_then_shows_first_phase_and_keeps_preview</code>。</td><td class="count">26</td>
+        <td class="scope">檔名與試聽同組，選檔與提交分離；無效替換保留原檔；轉譜不鎖試聽；取消等待背景結束。五階段映射、目前階段與已完成分段；取消及斷線停止動畫。新增 <code>test_AudioScoreWorkspace_when_stage_is_%s_then_shows_current_phase</code>（9 種階段）及 <code>test_AudioScoreWorkspace_when_upload_pending_then_shows_first_phase_and_keeps_preview</code>。</td><td class="count">27</td>
         <td class="function"><code>test_AudioScoreWorkspace_when_empty_then_shows_file_picker_without_submit</code><br><code>test_AudioScoreWorkspace_when_file_selected_then_keeps_picker_separate_from_submit</code><br><code>test_AudioScoreWorkspace_when_wav_dropped_then_selects_file_without_starting_transcription</code><br><code>test_AudioScoreWorkspace_when_non_wav_selected_then_blocks_submit</code><br><code>test_AudioScoreWorkspace_when_upload_fails_then_shows_error_and_allows_retry</code><br><code>test_AudioScoreWorkspace_when_existing_job_restored_then_displays_processing_and_can_cancel</code><br><code>test_AudioScoreWorkspace_when_poll_connection_fails_then_keeps_active_job_recoverable</code><br><code>test_AudioScoreWorkspace_when_saved_job_no_longer_exists_then_allows_new_upload</code><br><code>test_AudioScoreWorkspace_when_restored_job_is_%s_then_can_clear_and_choose_again</code>（failed、cancelled）<br><code>test_AudioScoreWorkspace_when_invalid_replacement_dropped_then_preserves_selected_file</code><br><code>test_AudioScoreWorkspace_when_transcribing_then_keeps_preview_enabled_and_cancel_acknowledged</code><br><code>test_AudioScoreWorkspace_when_restoring_pending_job_then_shows_processing_feedback</code><br><code>test_AudioScoreWorkspace_when_cancel_accepted_but_worker_running_then_waits_for_terminal_status</code></td>
         <td class="io">選檔、拖放、移除、上傳錯誤、工作恢復、暫時斷線與 404。</td><td class="io">選檔不提交；移除恢復選檔；處理中不能替換；恢復失敗或取消工作後仍能清除重選。另含 <code>test_AudioScoreWorkspace_when_file_removed_then_returns_to_empty_without_submitting</code>、<code>test_AudioScoreWorkspace_when_busy_then_blocks_replacement_and_removal</code>、<code>test_AudioScoreWorkspace_when_drag_leaves_picker_then_clears_highlight</code>。</td>
       </tr>

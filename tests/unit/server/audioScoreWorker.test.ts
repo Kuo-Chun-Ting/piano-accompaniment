@@ -2,7 +2,10 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, test, vi } from 'vitest'
-import { createAudioScoreWorker } from '../../../server/services/audioScoreWorker'
+import {
+  buildAudioScoreWorkerCommand,
+  createAudioScoreWorker,
+} from '../../../server/services/audioScoreWorker'
 
 const paths: string[] = []
 const worker = createAudioScoreWorker(resolve('tests/fixtures/audio-worker'))
@@ -23,6 +26,36 @@ test('test_audioScoreWorker_when_cli_succeeds_then_reports_chunked_stages_and_ke
   // Assert
   expect(onStage).toHaveBeenCalledWith('transcribe-midi')
   await vi.waitFor(async () => expect(await readFile(join(input.directory, 'pipeline.log'), 'utf8')).toContain('Fixture diagnostic'))
+})
+
+test('test_buildAudioScoreWorkerCommand_when_development_then_runs_source_without_viewer', () => {
+  // Arrange
+  const projectDirectory = '/project'
+  const input = '/data/song.wav'
+
+  // Act
+  const command = buildAudioScoreWorkerCommand(projectDirectory, input, false)
+
+  // Assert
+  expect(command).toEqual({
+    cwd: projectDirectory,
+    args: ['--import', 'tsx', 'scripts/audio-score.ts', input, '--skip-viewer'],
+  })
+})
+
+test('test_buildAudioScoreWorkerCommand_when_production_then_runs_bundled_pipeline_without_viewer', () => {
+  // Arrange
+  const projectDirectory = '/project'
+  const input = '/data/song.wav'
+
+  // Act
+  const command = buildAudioScoreWorkerCommand(projectDirectory, input, true)
+
+  // Assert
+  expect(command).toEqual({
+    cwd: projectDirectory,
+    args: ['/project/.output/audio-score.mjs', input, '--skip-viewer'],
+  })
 })
 
 test('test_audioScoreWorker_when_cli_exits_nonzero_then_rejects', async () => {
