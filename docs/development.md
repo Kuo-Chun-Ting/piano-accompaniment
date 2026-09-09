@@ -2,22 +2,25 @@
 
 ## Models
 
-Both local development and Docker need downloaded model files. See [runtime.ts](../shared/audio-transcription/runtime.ts) for the required files and folder structure. There is no model setup script yet. The first transcription may download additional model files.
+Docker downloads missing models into the `audio-score-models` volume before starting Nuxt. No host model directory or API key is needed. `AUDIO_SCORE_MODELS_DIR` is no longer used by Compose; existing host model files are left untouched.
 
-Docker reads models from `.audio-score-models/` at the project root by default. To use another folder, copy `.env.example` to `.env` and set an absolute path:
+[models.json](../scripts/audio-score/models.json) pins download URLs and SHA256 hashes for BS-RoFormer, All-In-One (including its Demucs dependency), and Whisper. TransKun includes its weights in the installed package. The downloads use the same upstream sources as the inference packages; their licenses still apply.
 
-```dotenv
-AUDIO_SCORE_MODELS_DIR="${HOME}/Library/Application Support/Piano Accompaniment/audio-score/models"
-PORT=3200
+[prepare-models.py](../scripts/audio-score/prepare-models.py) verifies existing files, replaces corrupt files, and publishes downloads only after checksum validation. It prepares Hugging Face snapshot directories and pins `refs/main` after all files pass. The server starts with `HF_HUB_OFFLINE=1` so inference uses these snapshots without updating them. A failed download prevents startup and is reported in the container logs.
+
+For local development, use the same setup script with your local runtime's model directory. On macOS:
+
+```bash
+python3 scripts/audio-score/prepare-models.py \
+  --models-dir "$HOME/Library/Application Support/Piano Accompaniment/audio-score/models" \
+  -- npm run dev -- --port 3200
 ```
 
-On Linux, use your Linux model path. If you copy models, preserve their symbolic links. The container user (UID 1000) needs write access to the folder to store caches.
-
-`.env` is ignored by Git. Use `.env.example` as the shared settings template.
+On Linux, use `~/.local/share/piano-accompaniment/audio-score/models`. Python dependencies and ffmpeg must be installed first for local development; Docker installs them during its build.
 
 ## Local Python Runtime
 
-Install ffmpeg and make it available on PATH. Create a Python virtual environment named `venv` at the location below and install [requirements.txt](../scripts/audio-score/requirements.txt) in it. Place the model files in the adjacent `models/` folder.
+Install ffmpeg and make it available on PATH. Create a Python virtual environment named `venv` at the location below and install [requirements.txt](../scripts/audio-score/requirements.txt) in it. The setup script above prepares the adjacent `models/` folder.
 
 - macOS: `~/Library/Application Support/Piano Accompaniment/audio-score/`
 - Linux: `~/.local/share/piano-accompaniment/audio-score/`
@@ -60,6 +63,6 @@ View server logs:
 docker compose logs -f web
 ```
 
-The server stores uploads, results, and logs in `.data/audio-scores/<job-id>/`. Docker stores this directory in the `audio-score-data` volume. Stopping or rebuilding the container keeps these files. `docker compose down -v` deletes them.
+The server stores uploads, results, and logs in `.data/audio-scores/<job-id>/`. Docker stores this directory in the `audio-score-data` volume and models in `audio-score-models`. Stopping or rebuilding the container keeps both volumes. **`docker compose down -v` deletes both the data and downloaded models.**
 
 The job list is held in memory. Keeping the files does not restore jobs after a server restart.

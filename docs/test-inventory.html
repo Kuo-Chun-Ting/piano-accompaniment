@@ -39,6 +39,57 @@
     <tbody>
       <tr>
         <td class="type">Unit</td>
+        <td class="file" rowspan="8"><code>tests/unit/audio-transcription/prepareModels.test.ts</code></td>
+        <td class="scope" rowspan="8">Model bootstrap, verified downloads, cache reuse, and startup gating.</td>
+        <td class="count" rowspan="8">8</td>
+        <td class="function"><code>test_prepareModels_when_cache_is_missing_then_downloads_before_starting_command</code></td>
+        <td class="io">Empty model directory and a file source</td>
+        <td class="io">Downloads verified weights before starting the command; enables offline inference.</td>
+      </tr>
+      <tr>
+        <td class="type">Unit</td>
+        <td class="function"><code>test_prepareModels_when_cache_is_valid_then_restarts_without_downloading</code></td>
+        <td class="io">Verified cache; source removed</td>
+        <td class="io">Startup succeeds without a download.</td>
+      </tr>
+      <tr>
+        <td class="type">Unit</td>
+        <td class="function"><code>test_prepareModels_when_cached_file_is_corrupt_then_replaces_it</code></td>
+        <td class="io">Corrupt cached weights</td>
+        <td class="io">Replaces them with verified source bytes.</td>
+      </tr>
+      <tr>
+        <td class="type">Unit</td>
+        <td class="function"><code>test_prepareModels_when_download_checksum_is_wrong_then_fails_without_starting_command</code></td>
+        <td class="io">Truncated source and a startup command</td>
+        <td class="io">Fails, removes partial file, and does not start the command.</td>
+      </tr>
+      <tr>
+        <td class="type">Unit</td>
+        <td class="function"><code>test_prepareModels_when_download_is_unavailable_then_fails_and_can_retry</code></td>
+        <td class="io">Missing source, then source restored</td>
+        <td class="io">Reports setup failure; the next run succeeds.</td>
+      </tr>
+      <tr>
+        <td class="type">Unit</td>
+        <td class="function"><code>test_prepareModels_when_manifest_escapes_model_directory_then_rejects_it</code></td>
+        <td class="io">Destination outside model directory</td>
+        <td class="io">Rejects the path without writing outside the directory.</td>
+      </tr>
+      <tr>
+        <td class="type">Unit</td>
+        <td class="function"><code>test_prepareModels_when_download_succeeds_then_publishes_pinned_cache_reference</code></td>
+        <td class="io">Snapshot download and revision reference</td>
+        <td class="io">Publishes the pinned cache reference after verification.</td>
+      </tr>
+      <tr>
+        <td class="type">Unit</td>
+        <td class="function"><code>test_prepareModels_when_download_fails_then_preserves_previous_cache_reference</code></td>
+        <td class="io">Bad snapshot download and existing reference</td>
+        <td class="io">Leaves the previous reference unchanged.</td>
+      </tr>
+      <tr>
+        <td class="type">Unit</td>
         <td class="file" rowspan="34"><code>tests/unit/audio-transcription/midiToScore.test.ts</code></td>
         <td class="scope" rowspan="34">輸入轉錄音符、踏板事件、歌詞時間、BPM、錄音長度與偵測拍點；預期每個 staff 以單一 voice、event、note 與局部連音穩定輸出完整譜面。</td>
         <td class="count" rowspan="34">34</td>

@@ -6,12 +6,9 @@ services:
       - "127.0.0.1:${PORT:-3200}:3200"
     volumes:
       - audio-score-data:/app/.data
-      - type: bind
-        source: ${AUDIO_SCORE_MODELS_DIR:-./.audio-score-models}
-        target: /runtime/models
-        bind:
-          create_host_path: false
+      - audio-score-models:/runtime/models
     restart: unless-stopped
 
 volumes:
   audio-score-data:
+  audio-score-models:

@@ -5,7 +5,7 @@ Items are ordered by recommended implementation priority.
 ## Public demo
 
 - [x] Fix the production build failure that cannot resolve `shared/audio-transcription/job.ts`.
-- [ ] Package Nuxt, Python, ffmpeg, dependencies, and model setup into a reproducible deployment environment.
+- [x] Package Nuxt, Python, ffmpeg, dependencies, and model setup into a reproducible deployment environment.
 - [ ] Measure processing time, memory, CPU, and disk usage with five- to six-minute recordings.
 - [ ] Deploy Nuxt and the Python pipeline together on one non-sleeping VM or container service.
 - [ ] Protect the demo with a shared password or invite code.
@@ -50,5 +50,5 @@ Items are ordered by recommended implementation priority.
 - The server accepts only one transcription at a time and rejects additional requests instead of queuing them.
 - Job records exist only in server memory and disappear after a restart.
 - Uploaded audio, generated files, and logs remain on the local filesystem until manually removed.
-- A fresh clone cannot transcribe until Python, ffmpeg, dependencies, caches, and model files are installed manually.
+- Docker prepares the runtime and models automatically; the first start requires internet access to download models.
 - Audio-score playback depends on piano samples hosted by an external CDN.

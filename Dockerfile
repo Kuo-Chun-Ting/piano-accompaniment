@@ -45,6 +45,7 @@ USER app
 RUN python scripts/audio-score/check-environment.py \
     && python -c "import torch, torchaudio; assert torch.version.cuda is None, 'Expected CPU-only PyTorch'"
 EXPOSE 3200
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10m \
     CMD node -e "fetch('http://127.0.0.1:3200/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+ENTRYPOINT ["python", "scripts/audio-score/prepare-models.py", "--models-dir", "/runtime/models", "--"]
 CMD ["node", ".output/server/index.mjs"]

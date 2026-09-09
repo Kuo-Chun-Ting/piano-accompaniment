@@ -4,16 +4,15 @@ Turn a WAV recording into a piano accompaniment score. Preview the audio, play t
 
 ## Quick Start (Docker)
 
-Install and start Docker with Docker Compose. You also need [downloaded model files](docs/development.md#models); model setup is not automated.
+Install and start Docker with Docker Compose, then run:
 
-1. Put the models in `.audio-score-models/` at the project root.
-2. Run:
+```bash
+docker compose up --build -d
+```
 
-   ```bash
-   docker compose up --build -d
-   ```
+The first start downloads and verifies the models before the website opens. Follow progress with `docker compose logs -f web`. Models are kept in a Docker volume and reused on later starts.
 
-Open [http://localhost:3200/](http://localhost:3200/), choose a WAV file, then select **Transcribe**. Copy `.env.example` to `.env` only if you need a different model directory or port.
+Open [http://localhost:3200/](http://localhost:3200/), choose a WAV file, then select **Transcribe**. Copy `.env.example` to `.env` only if you need a different port.
 
 To stop:
 
